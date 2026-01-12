@@ -1,0 +1,49 @@
+{
+  "name": "nberic-task-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:next": "next dev",
+    "dev:socket": "ts-node -r tsconfig-paths/register --project tsconfig.server.json socketServer.ts",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:migrate": "sequelize-cli db:migrate",
+    "db:migrate:undo": "sequelize-cli db:migrate:undo",
+    "db:seed": "sequelize-cli db:seed:all"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.2.0",
+    "bcrypt": "^5.1.1",
+    "clsx": "^2.1.0",
+    "dotenv": "^17.2.3",
+    "jsonwebtoken": "^9.0.2",
+    "mariadb": "^3.2.0",
+    "next": "^14.2.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "react-redux": "^9.1.0",
+    "sequelize": "^6.35.0",
+    "socket.io": "^4.7.0",
+    "socket.io-client": "^4.7.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/bcrypt": "^5.0.2",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.17",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "^14.2.0",
+    "postcss": "^8.4.33",
+    "sequelize-cli": "^6.6.2",
+    "tailwindcss": "^4.0.0",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.3.3"
+  }
+}

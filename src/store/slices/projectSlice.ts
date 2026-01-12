@@ -1,6 +1,6 @@
 // Project Redux slice with normalized state
 
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
 import { Project } from '@/types/entities';
 
 /**
@@ -265,17 +265,24 @@ const projectSlice = createSlice({
 export const { setCurrentProject, updateProjectInState, clearError } = projectSlice.actions;
 export default projectSlice.reducer;
 
-// Selectors for normalized state
-export const selectAllProjects = (state: { project: ProjectState }): Project[] => {
-  return state.project.ids.map((id) => state.project.entities[id]);
-};
+// Base selector
+const selectProjectState = (state: { project: ProjectState }) => state.project;
+
+// Memoized selectors for normalized state
+export const selectAllProjects = createSelector(
+  [selectProjectState],
+  (projectState) => projectState.ids.map((id) => projectState.entities[id])
+);
 
 export const selectProjectById = (state: { project: ProjectState }, projectId: number): Project | undefined => {
   return state.project.entities[projectId];
 };
 
-export const selectCurrentProject = (state: { project: ProjectState }): Project | null => {
-  if (!state.project.currentProjectId) return null;
-  return state.project.entities[state.project.currentProjectId] || null;
-};
+export const selectCurrentProject = createSelector(
+  [selectProjectState],
+  (projectState) => {
+    if (!projectState.currentProjectId) return null;
+    return projectState.entities[projectState.currentProjectId] || null;
+  }
+);
 

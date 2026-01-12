@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAppSelector } from '@/store/hooks';
+import { UserRole } from '@/types/entities';
 
 interface NavItem {
   name: string;
@@ -70,6 +72,76 @@ const navItems: NavItem[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const { user } = useAppSelector((state) => state.auth);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  
+  // Fetch pending requests count for managers
+  useEffect(() => {
+    if (user?.role === UserRole.MANAGER) {
+      const fetchPendingCount = async () => {
+        try {
+          const response = await fetch('/api/task-requests/count', {
+            credentials: 'include',
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setPendingRequestsCount(data.count || 0);
+          }
+        } catch (error) {
+          console.error('Failed to fetch pending requests count:', error);
+        }
+      };
+      
+      fetchPendingCount();
+      // Refresh count every 30 seconds
+      const interval = setInterval(fetchPendingCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user?.role]);
+  
+  // Listen for socket events to update count
+  useEffect(() => {
+    if (user?.role !== UserRole.MANAGER) return;
+
+    import('@/lib/socket/client').then(({ getSocket }) => {
+      const socket = getSocket();
+      if (!socket) return;
+
+      const handleRequestCreated = () => {
+        setPendingRequestsCount((prev) => prev + 1);
+      };
+
+      const handleRequestProcessed = () => {
+        setPendingRequestsCount((prev) => Math.max(0, prev - 1));
+      };
+
+      socket.on('task-request:created', handleRequestCreated);
+      socket.on('task-request:approved', handleRequestProcessed);
+      socket.on('task-request:rejected', handleRequestProcessed);
+
+      return () => {
+        socket.off('task-request:created', handleRequestCreated);
+        socket.off('task-request:approved', handleRequestProcessed);
+        socket.off('task-request:rejected', handleRequestProcessed);
+      };
+    });
+  }, [user?.role]);
+  
+  // Add Requests link for managers
+  const managerNavItems = user?.role === UserRole.MANAGER ? [
+    {
+      name: 'Requests',
+      href: '/dashboard/requests',
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+      badgeCount: pendingRequestsCount,
+    },
+  ] : [];
+  
+  const allNavItems = [...navItems, ...managerNavItems];
 
   return (
     <>
@@ -117,15 +189,16 @@ export default function Sidebar() {
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-            {navItems.map((item) => {
+            {allNavItems.map((item) => {
               const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+              const badgeCount = (item as any).badgeCount || 0;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={() => setIsMobileOpen(false)}
                   className={`
-                    flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors
+                    flex items-center justify-between px-4 py-3 rounded-lg transition-colors
                     ${
                       isActive
                         ? 'bg-indigo-50 text-indigo-700 font-medium'
@@ -133,8 +206,15 @@ export default function Sidebar() {
                     }
                   `}
                 >
-                  <span className={isActive ? 'text-indigo-600' : 'text-gray-400'}>{item.icon}</span>
-                  <span>{item.name}</span>
+                  <div className="flex items-center space-x-3">
+                    <span className={isActive ? 'text-indigo-600' : 'text-gray-400'}>{item.icon}</span>
+                    <span>{item.name}</span>
+                  </div>
+                  {badgeCount > 0 && (
+                    <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold text-white bg-red-500 rounded-full">
+                      {badgeCount > 9 ? '9+' : badgeCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}

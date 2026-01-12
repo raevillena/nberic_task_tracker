@@ -6,6 +6,7 @@ import { authenticateSocket } from './middleware';
 import { setupRoomHandlers } from './handlers/roomHandlers';
 import { setupMessageHandlers } from './handlers/messageHandlers';
 import { setupTypingHandlers, cleanupTypingIndicators } from './handlers/typingHandlers';
+import { setSocketInstance } from './instance';
 import {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -42,6 +43,9 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
 
   // Authentication middleware
   io.use(authenticateSocket);
+
+  // Store instance globally so API routes can access it
+  setSocketInstance(io);
 
   // Connection handler
   io.on('connection', (socket: TypedSocket) => {

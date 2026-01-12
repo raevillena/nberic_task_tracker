@@ -42,7 +42,8 @@ export default function StudyDetailPage() {
   const [taskName, setTaskName] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskPriority, setTaskPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
-  const [assignedToId, setAssignedToId] = useState<string>('');
+  const [assignedToId, setAssignedToId] = useState<string>(''); // Legacy single assignment
+  const [assignedUserIds, setAssignedUserIds] = useState<number[]>([]); // Multiple assignments
   const [dueDate, setDueDate] = useState('');
   const [researchers, setResearchers] = useState<Array<{ id: number; email: string; firstName: string; lastName: string }>>([]);
   const [loadingResearchers, setLoadingResearchers] = useState(false);
@@ -153,7 +154,7 @@ export default function StudyDetailPage() {
           name: taskName.trim(),
           description: taskDescription.trim() || undefined,
           priority: taskPriority,
-          assignedToId: assignedToId ? parseInt(assignedToId, 10) : undefined,
+          assignedToId: assignedUserIds.length > 0 ? assignedUserIds[0] : (assignedToId ? parseInt(assignedToId, 10) : undefined),
           dueDate: dueDate || undefined,
         },
       })
@@ -161,6 +162,22 @@ export default function StudyDetailPage() {
 
     if (createTaskThunk.fulfilled.match(result)) {
       const task = result.payload;
+      
+      // Assign to multiple researchers if selected
+      if (assignedUserIds.length > 0 && task && task.id) {
+        try {
+          await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${task.id}/assign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ userIds: assignedUserIds }),
+          });
+        } catch (error) {
+          console.error('Failed to assign multiple researchers:', error);
+          // Continue anyway - task was created
+        }
+      }
+      
       // Refresh tasks list
       dispatch(fetchTasksByStudyThunk(studyId));
       // Close modal and reset form
@@ -169,24 +186,9 @@ export default function StudyDetailPage() {
       setTaskDescription('');
       setTaskPriority(TaskPriority.MEDIUM);
       setAssignedToId('');
+      setAssignedUserIds([]);
       setDueDate('');
       setTaskFormError(null);
-      
-      // Show success toast notification
-      dispatch(
-        addNotification({
-          id: `task-created-${task.id}-${Date.now()}`,
-          type: 'task',
-          title: 'Task Created',
-          message: `Task "${task.name}" has been created successfully.`,
-          taskId: task.id,
-          studyId: studyId,
-          projectId: projectId,
-          timestamp: new Date(),
-          read: false,
-          actionUrl: `/dashboard/projects/${projectId}/studies/${studyId}/tasks/${task.id}`,
-        })
-      );
     } else {
       setTaskFormError(result.payload as string || 'Failed to create task');
     }
@@ -561,10 +563,11 @@ export default function StudyDetailPage() {
                     setShowCreateTaskModal(false);
                     setTaskName('');
                     setTaskDescription('');
-                    setTaskPriority(TaskPriority.MEDIUM);
-                    setAssignedToId('');
-                    setDueDate('');
-                    setTaskFormError(null);
+                      setTaskPriority(TaskPriority.MEDIUM);
+                      setAssignedToId('');
+                      setAssignedUserIds([]);
+                      setDueDate('');
+                      setTaskFormError(null);
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
@@ -625,25 +628,49 @@ export default function StudyDetailPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="assignedTo" className="block text-sm font-medium text-gray-700 mb-2">
-                    Assign To
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Assign To (Select multiple researchers)
                   </label>
-                  <select
-                    id="assignedTo"
-                    value={assignedToId}
-                    onChange={(e) => setAssignedToId(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                    disabled={isCreatingTask || loadingResearchers}
-                  >
-                    <option value="">Unassigned</option>
-                    {researchers.map((researcher) => (
-                      <option key={researcher.id} value={researcher.id}>
-                        {researcher.firstName} {researcher.lastName} ({researcher.email})
-                      </option>
-                    ))}
-                  </select>
-                  {loadingResearchers && (
-                    <p className="mt-1 text-sm text-gray-500">Loading researchers...</p>
+                  <div className="border border-gray-300 rounded-md max-h-48 overflow-y-auto p-2">
+                    {loadingResearchers ? (
+                      <p className="text-sm text-gray-500 py-2">Loading researchers...</p>
+                    ) : researchers.length === 0 ? (
+                      <p className="text-sm text-gray-500 py-2">No researchers available</p>
+                    ) : (
+                      researchers.map((researcher) => (
+                        <label key={researcher.id} className="flex items-center space-x-2 py-2 px-2 hover:bg-gray-50 rounded cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={assignedUserIds.includes(researcher.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setAssignedUserIds([...assignedUserIds, researcher.id]);
+                                // Also update legacy field for backward compatibility
+                                if (!assignedToId) {
+                                  setAssignedToId(researcher.id);
+                                }
+                              } else {
+                                setAssignedUserIds(assignedUserIds.filter((id) => id !== researcher.id));
+                                // Update legacy field if it was the removed user
+                                if (assignedToId === researcher.id) {
+                                  setAssignedToId(assignedUserIds.length > 1 ? assignedUserIds[0] : '');
+                                }
+                              }
+                            }}
+                            disabled={isCreatingTask}
+                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="text-sm text-gray-700">
+                            {researcher.firstName} {researcher.lastName} ({researcher.email})
+                          </span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  {assignedUserIds.length > 0 && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      {assignedUserIds.length} researcher{assignedUserIds.length !== 1 ? 's' : ''} selected
+                    </p>
                   )}
                 </div>
 
@@ -676,6 +703,7 @@ export default function StudyDetailPage() {
                       setTaskDescription('');
                       setTaskPriority(TaskPriority.MEDIUM);
                       setAssignedToId('');
+                      setAssignedUserIds([]);
                       setDueDate('');
                       setTaskFormError(null);
                     }}

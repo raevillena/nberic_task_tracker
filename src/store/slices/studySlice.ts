@@ -1,6 +1,6 @@
 // Study Redux slice with normalized state
 
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
 import { Study } from '@/types/entities';
 
 /**
@@ -314,22 +314,32 @@ const studySlice = createSlice({
 export const { setCurrentStudy, updateStudyInState, clearError } = studySlice.actions;
 export default studySlice.reducer;
 
-// Selectors for normalized state
-export const selectAllStudies = (state: { study: StudyState }): Study[] => {
-  return state.study.ids.map((id) => state.study.entities[id]);
-};
+// Base selector
+const selectStudyState = (state: { study: StudyState }) => state.study;
+
+// Memoized selectors for normalized state
+export const selectAllStudies = createSelector(
+  [selectStudyState],
+  (studyState) => studyState.ids.map((id) => studyState.entities[id])
+);
 
 export const selectStudyById = (state: { study: StudyState }, studyId: number): Study | undefined => {
   return state.study.entities[studyId];
 };
 
-export const selectStudiesByProjectId = (state: { study: StudyState }, projectId: number): Study[] => {
-  const studyIds = state.study.byProjectId[projectId] || [];
-  return studyIds.map((id) => state.study.entities[id]).filter(Boolean);
-};
+export const selectStudiesByProjectId = createSelector(
+  [selectStudyState, (_state: { study: StudyState }, projectId: number) => projectId],
+  (studyState, projectId) => {
+    const studyIds = studyState.byProjectId[projectId] || [];
+    return studyIds.map((id) => studyState.entities[id]).filter(Boolean);
+  }
+);
 
-export const selectCurrentStudy = (state: { study: StudyState }): Study | null => {
-  if (!state.study.currentStudyId) return null;
-  return state.study.entities[state.study.currentStudyId] || null;
-};
+export const selectCurrentStudy = createSelector(
+  [selectStudyState],
+  (studyState) => {
+    if (!studyState.currentStudyId) return null;
+    return studyState.entities[studyState.currentStudyId] || null;
+  }
+);
 

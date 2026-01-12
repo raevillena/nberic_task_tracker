@@ -9,8 +9,11 @@ import { fetchAllTasksThunk, selectAllTasks, createTaskThunk } from '@/store/sli
 import { fetchProjectsThunk, selectAllProjects } from '@/store/slices/projectSlice';
 import { fetchStudiesByProjectThunk, selectStudiesByProjectId } from '@/store/slices/studySlice';
 import { addNotification } from '@/store/slices/notificationSlice';
-import { TaskStatus, TaskPriority, User } from '@/types/entities';
+import { TaskStatus, TaskPriority, User, Study } from '@/types/entities';
 import Link from 'next/link';
+
+// Stable empty array to prevent unnecessary rerenders
+const EMPTY_STUDIES: Study[] = [];
 
 export default function TasksPage() {
   const router = useRouter();
@@ -27,7 +30,8 @@ export default function TasksPage() {
   const [taskName, setTaskName] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskPriority, setTaskPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
-  const [assignedToId, setAssignedToId] = useState<number | ''>('');
+  const [assignedToId, setAssignedToId] = useState<number | ''>(''); // Legacy single assignment
+  const [assignedUserIds, setAssignedUserIds] = useState<number[]>([]); // Multiple assignments
   const [dueDate, setDueDate] = useState('');
   const [researchers, setResearchers] = useState<User[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
@@ -71,7 +75,7 @@ export default function TasksPage() {
   const availableStudies = useAppSelector((state) =>
     selectedProjectId && !isNaN(selectedProjectId as number)
       ? selectStudiesByProjectId(state, selectedProjectId as number)
-      : []
+      : EMPTY_STUDIES
   );
 
   // Helper functions for status and priority styling
@@ -133,6 +137,7 @@ export default function TasksPage() {
       return;
     }
 
+    // Create task first, then assign if researchers selected
     const result = await dispatch(
       createTaskThunk({
         studyId: selectedStudyId as number,
@@ -140,7 +145,7 @@ export default function TasksPage() {
           name: taskName.trim(),
           description: taskDescription.trim() || undefined,
           priority: taskPriority,
-          assignedToId: assignedToId ? (assignedToId as number) : undefined,
+          assignedToId: assignedUserIds.length > 0 ? assignedUserIds[0] : (assignedToId ? (assignedToId as number) : undefined),
           dueDate: dueDate || undefined,
         },
       })
@@ -148,37 +153,36 @@ export default function TasksPage() {
 
     if (createTaskThunk.fulfilled.match(result)) {
       const task = result.payload;
+      const projectId = availableStudies.find((s) => s.id === selectedStudyId)?.projectId;
+      
+      // Assign to researchers if selected
+      if (assignedUserIds.length > 0 && task && task.id && projectId) {
+        try {
+          await fetch(`/api/projects/${projectId}/studies/${selectedStudyId}/tasks/${task.id}/assign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ userIds: assignedUserIds }),
+          });
+        } catch (error) {
+          console.error('Failed to assign multiple researchers:', error);
+          // Continue anyway - task was created
+        }
+      }
+      
       // Refresh tasks list
       dispatch(fetchAllTasksThunk());
       // Close modal and reset form
       setShowCreateModal(false);
-      const projectId = availableStudies.find((s) => s.id === selectedStudyId)?.projectId;
       setSelectedProjectId('');
       setSelectedStudyId('');
       setTaskName('');
       setTaskDescription('');
       setTaskPriority(TaskPriority.MEDIUM);
       setAssignedToId('');
+      setAssignedUserIds([]);
       setDueDate('');
       setFormError(null);
-      
-      // Show success toast notification
-      if (task && task.id && projectId) {
-        dispatch(
-          addNotification({
-            id: `task-created-${task.id}-${Date.now()}`,
-            type: 'task',
-            title: 'Task Created',
-            message: `Task "${task.name}" has been created successfully.`,
-            taskId: task.id,
-            studyId: task.studyId,
-            projectId: projectId,
-            timestamp: new Date(),
-            read: false,
-            actionUrl: `/dashboard/projects/${projectId}/studies/${task.studyId}/tasks/${task.id}`,
-          })
-        );
-      }
       
       // Navigate to the task detail page if available
       if (task && task.id && projectId) {
@@ -446,23 +450,50 @@ export default function TasksPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="assignedTo" className="block text-sm font-medium text-gray-700 mb-2">
-                    Assign To
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Assign To (Select multiple researchers)
                   </label>
-                  <select
-                    id="assignedTo"
-                    value={assignedToId}
-                    onChange={(e) => setAssignedToId(e.target.value ? parseInt(e.target.value, 10) : '')}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                    disabled={isCreating || loadingResearchers}
-                  >
-                    <option value="">Unassigned</option>
-                    {researchers.map((researcher) => (
-                      <option key={researcher.id} value={researcher.id}>
-                        {researcher.firstName} {researcher.lastName} ({researcher.email})
-                      </option>
-                    ))}
-                  </select>
+                  <div className="border border-gray-300 rounded-md max-h-48 overflow-y-auto p-2">
+                    {loadingResearchers ? (
+                      <p className="text-sm text-gray-500 py-2">Loading researchers...</p>
+                    ) : researchers.length === 0 ? (
+                      <p className="text-sm text-gray-500 py-2">No researchers available</p>
+                    ) : (
+                      researchers.map((researcher) => (
+                        <label key={researcher.id} className="flex items-center space-x-2 py-2 px-2 hover:bg-gray-50 rounded cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={assignedUserIds.includes(researcher.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setAssignedUserIds([...assignedUserIds, researcher.id]);
+                                // Also update legacy field for backward compatibility
+                                if (!assignedToId) {
+                                  setAssignedToId(researcher.id);
+                                }
+                              } else {
+                                setAssignedUserIds(assignedUserIds.filter((id) => id !== researcher.id));
+                                // Update legacy field if it was the removed user
+                                if (assignedToId === researcher.id) {
+                                  setAssignedToId(assignedUserIds.length > 1 ? assignedUserIds[0] : '');
+                                }
+                              }
+                            }}
+                            disabled={isCreating}
+                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="text-sm text-gray-700">
+                            {researcher.firstName} {researcher.lastName} ({researcher.email})
+                          </span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  {assignedUserIds.length > 0 && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      {assignedUserIds.length} researcher{assignedUserIds.length !== 1 ? 's' : ''} selected
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -496,6 +527,7 @@ export default function TasksPage() {
                       setTaskDescription('');
                       setTaskPriority(TaskPriority.MEDIUM);
                       setAssignedToId('');
+                      setAssignedUserIds([]);
                       setDueDate('');
                       setFormError(null);
                     }}

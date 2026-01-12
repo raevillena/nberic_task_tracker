@@ -12,6 +12,7 @@ import {
   setBellOpen,
   markAsRead,
   markAllAsRead,
+  markNotificationAsReadThunk,
 } from '@/store/slices/notificationSlice';
 import { useRouter } from 'next/navigation';
 
@@ -42,8 +43,12 @@ export function NotificationBell() {
     }
   }, [isOpen, dispatch]);
 
-  const handleNotificationClick = (notification: typeof notifications[0]) => {
+  const handleNotificationClick = async (notification: typeof notifications[0]) => {
     dispatch(markAsRead(notification.id));
+    // Also update in DB if it's a DB notification
+    if (notification.id.startsWith('db-')) {
+      dispatch(markNotificationAsReadThunk(notification.id));
+    }
     dispatch(setBellOpen(false));
 
     // Navigate to the notification's action URL

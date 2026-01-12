@@ -30,13 +30,21 @@ type TypedIO = SocketIOServer<
 export function setupRoomHandlers(socket: TypedSocket, io: TypedIO): void {
   const userId = socket.data.userId;
   const userRole = socket.data.userRole as UserRole;
+  
+  // Declare logging utilities once at function scope
+  const fs = require('fs');
+  const path = require('path');
+  const logPath = path.join(process.cwd(), '.cursor', 'debug.log');
 
   socket.on('room:join', async (data: Parameters<ClientToServerEvents['room:join']>[0]) => {
     try {
       const { type, id } = data;
 
+      fs.appendFileSync(logPath, `[ROOM:JOIN] User ${userId} (${userRole}) attempting to join ${type}:${id}\n`);
+
       // Validate room type for messaging (project, study, or task)
       if (type !== 'project' && type !== 'study' && type !== 'task') {
+        fs.appendFileSync(logPath, `[ROOM:JOIN] Invalid room type: ${type}\n`);
         socket.emit('room:error', {
           message: 'Invalid room type for messaging',
           roomType: type as 'project' | 'study' | 'task',
@@ -53,7 +61,10 @@ export function setupRoomHandlers(socket: TypedSocket, io: TypedIO): void {
         id
       );
 
+      fs.appendFileSync(logPath, `[ROOM:JOIN] Access check result for ${type}:${id}: ${hasAccess}\n`);
+
       if (!hasAccess) {
+        fs.appendFileSync(logPath, `[ROOM:JOIN] Access denied for User ${userId} to ${type}:${id}\n`);
         socket.emit('room:error', {
           message: 'Access denied to this room',
           roomType: type,
@@ -70,6 +81,8 @@ export function setupRoomHandlers(socket: TypedSocket, io: TypedIO): void {
       const room = io.sockets.adapter.rooms.get(roomKey);
       const memberCount = room ? room.size : 0;
 
+      fs.appendFileSync(logPath, `[ROOM:JOIN] User ${userId} successfully joined ${roomKey}, memberCount=${memberCount}\n`);
+
       // Emit success
       socket.emit('room:joined', {
         roomType: type,
@@ -79,7 +92,8 @@ export function setupRoomHandlers(socket: TypedSocket, io: TypedIO): void {
 
       // Load and send message history
       await sendMessageHistory(socket, type, id);
-    } catch (error) {
+    } catch (error: any) {
+      fs.appendFileSync(logPath, `[ROOM:JOIN] ERROR for User ${userId} joining ${data.type}:${data.id}: ${error?.message || error}\n`);
       socket.emit('error', {
         message: 'Failed to join room',
         code: 'ROOM_JOIN_ERROR',

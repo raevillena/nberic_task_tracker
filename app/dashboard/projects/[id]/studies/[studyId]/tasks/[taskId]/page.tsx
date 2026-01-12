@@ -33,6 +33,11 @@ export default function TaskDetailPage() {
   const [editPriority, setEditPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
   const [editStatus, setEditStatus] = useState<TaskStatus>(TaskStatus.PENDING);
   const [formError, setFormError] = useState<string | null>(null);
+  const [showReassignDialog, setShowReassignDialog] = useState(false);
+  const [reassignUserId, setReassignUserId] = useState<number | ''>('');
+  const [reassignNotes, setReassignNotes] = useState('');
+  const [isRequesting, setIsRequesting] = useState(false);
+  const [researchers, setResearchers] = useState<any[]>([]);
 
   useEffect(() => {
     if (taskId && !isNaN(taskId) && projectId && !isNaN(projectId) && studyId && !isNaN(studyId)) {
@@ -126,19 +131,100 @@ export default function TaskDetailPage() {
   };
 
   const handleComplete = async () => {
-    const result = await dispatch(
-      updateTaskThunk({
-        projectId,
-        studyId,
-        taskId,
-        taskData: {
-          status: TaskStatus.COMPLETED,
-        },
-      })
-    );
+    try {
+      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/complete`, {
+        method: 'POST',
+        credentials: 'include',
+      });
 
-    if (updateTaskThunk.fulfilled.match(result)) {
+      if (!response.ok) {
+        const error = await response.json();
+        setFormError(error.message || 'Failed to complete task');
+        return;
+      }
+
       dispatch(fetchTaskByIdThunk({ projectId, studyId, taskId }));
+    } catch (error) {
+      setFormError('Failed to complete task');
+    }
+  };
+
+  // Load researchers for reassignment dialog
+  useEffect(() => {
+    if (showReassignDialog && researchers.length === 0) {
+      fetch('/api/users/researchers', { credentials: 'include' })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.data) {
+            // Filter out current user
+            setResearchers(data.data.filter((r: any) => r.id !== user?.id));
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to fetch researchers:', err);
+        });
+    }
+  }, [showReassignDialog, researchers.length, user?.id]);
+
+
+  const handleRequestCompletion = async () => {
+    setIsRequesting(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/request-completion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        setFormError(error.message || 'Failed to request completion');
+        return;
+      }
+
+      alert('Completion request submitted. Waiting for manager approval.');
+      dispatch(fetchTaskByIdThunk({ projectId, studyId, taskId }));
+    } catch (error) {
+      setFormError('Failed to request completion');
+    } finally {
+      setIsRequesting(false);
+    }
+  };
+
+  const handleRequestReassignment = async () => {
+    if (!reassignUserId || isNaN(reassignUserId as number)) {
+      setFormError('Please select a researcher to reassign to');
+      return;
+    }
+
+    setIsRequesting(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/request-reassignment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          requestedAssignedToId: reassignUserId,
+          notes: reassignNotes || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        setFormError(error.message || 'Failed to request reassignment');
+        return;
+      }
+
+      alert('Reassignment request submitted. Waiting for manager approval.');
+      setShowReassignDialog(false);
+      setReassignUserId('');
+      setReassignNotes('');
+      dispatch(fetchTaskByIdThunk({ projectId, studyId, taskId }));
+    } catch (error) {
+      setFormError('Failed to request reassignment');
+    } finally {
+      setIsRequesting(false);
     }
   };
 
@@ -203,9 +289,18 @@ export default function TaskDetailPage() {
     }
   };
 
-  const canEdit = user?.role === UserRole.MANAGER || (user?.role === UserRole.RESEARCHER && task.assignedToId === user.id);
+  // Check if researcher is assigned (legacy or new many-to-many)
+  const isAssigned = user?.role === UserRole.RESEARCHER && (
+    task.assignedToId === user.id ||
+    (task.assignedResearchers && task.assignedResearchers.some((r) => r.id === user.id))
+  );
+  
+  const canEdit = user?.role === UserRole.MANAGER || isAssigned;
   const canDelete = user?.role === UserRole.MANAGER;
-  const canComplete = (user?.role === UserRole.MANAGER || (user?.role === UserRole.RESEARCHER && task.assignedToId === user.id)) && task.status !== TaskStatus.COMPLETED;
+  const canRequestCompletion = isAssigned && task.status !== TaskStatus.COMPLETED && task.status !== TaskStatus.CANCELLED;
+  const canRequestReassignment = isAssigned && task.status !== TaskStatus.COMPLETED && task.status !== TaskStatus.CANCELLED;
+  // Both managers and assigned researchers can complete tasks
+  const canComplete = (user?.role === UserRole.MANAGER || isAssigned) && task.status !== TaskStatus.COMPLETED;
 
   return (
     <div>
@@ -335,7 +430,25 @@ export default function TaskDetailPage() {
             )}
           </div>
           {!isEditing && (
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
+              {canRequestCompletion && (
+                <button
+                  onClick={handleRequestCompletion}
+                  disabled={isRequesting || isUpdating}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                >
+                  {isRequesting ? 'Requesting...' : 'Request Completion'}
+                </button>
+              )}
+              {canRequestReassignment && (
+                <button
+                  onClick={() => setShowReassignDialog(true)}
+                  disabled={isRequesting || isUpdating}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50"
+                >
+                  Request Reassignment
+                </button>
+              )}
               {canComplete && (
                 <button
                   onClick={handleComplete}
@@ -396,7 +509,15 @@ export default function TaskDetailPage() {
             <div>
               <dt className="text-sm font-medium text-gray-500">Assigned To</dt>
               <dd className="mt-1 text-sm text-gray-900">
-                {task.assignedTo ? (
+                {task.assignedResearchers && task.assignedResearchers.length > 0 ? (
+                  <div className="space-y-1">
+                    {task.assignedResearchers.map((researcher) => (
+                      <div key={researcher.id}>
+                        {researcher.firstName} {researcher.lastName} ({researcher.email})
+                      </div>
+                    ))}
+                  </div>
+                ) : task.assignedTo ? (
                   `${task.assignedTo.firstName} ${task.assignedTo.lastName} (${task.assignedTo.email})`
                 ) : (
                   <span className="text-gray-400">Unassigned</span>
@@ -472,6 +593,97 @@ export default function TaskDetailPage() {
           />
         </div>
       </div>
+
+      {/* Reassignment Request Dialog */}
+      {showReassignDialog && (
+        <div className="fixed inset-0 backdrop-blur-sm bg-black/20 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Request Reassignment</h2>
+                <button
+                  onClick={() => {
+                    setShowReassignDialog(false);
+                    setReassignUserId('');
+                    setReassignNotes('');
+                    setFormError(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="reassignUser" className="block text-sm font-medium text-gray-700 mb-2">
+                    Reassign To <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="reassignUser"
+                    value={reassignUserId}
+                    onChange={(e) => setReassignUserId(e.target.value ? parseInt(e.target.value, 10) : '')}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                    disabled={isRequesting}
+                  >
+                    <option value="">Select a researcher...</option>
+                    {researchers.map((researcher) => (
+                      <option key={researcher.id} value={researcher.id}>
+                        {researcher.firstName} {researcher.lastName} ({researcher.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="reassignNotes" className="block text-sm font-medium text-gray-700 mb-2">
+                    Notes (Optional)
+                  </label>
+                  <textarea
+                    id="reassignNotes"
+                    value={reassignNotes}
+                    onChange={(e) => setReassignNotes(e.target.value)}
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Reason for reassignment request..."
+                    disabled={isRequesting}
+                  />
+                </div>
+
+                {formError && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+                    <p className="text-sm text-red-800">{formError}</p>
+                  </div>
+                )}
+
+                <div className="flex space-x-4">
+                  <button
+                    onClick={handleRequestReassignment}
+                    disabled={isRequesting || !reassignUserId}
+                    className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isRequesting ? 'Submitting...' : 'Submit Request'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowReassignDialog(false);
+                      setReassignUserId('');
+                      setReassignNotes('');
+                      setFormError(null);
+                    }}
+                    disabled={isRequesting}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

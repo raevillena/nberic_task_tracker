@@ -39,7 +39,6 @@ export async function getMessagesByRoom(
   if (cursor) {
     whereClause.id = { [Op.lt]: cursor };
   }
-
   const messages = await Message.findAll({
     where: whereClause,
     include: [
@@ -113,7 +112,9 @@ export async function createMessage(
   }
 
   // Create message
-  const message = await Message.create({
+  let message;
+  try {
+    message = await Message.create({
     roomType,
     roomId,
     senderId,
@@ -124,7 +125,11 @@ export async function createMessage(
     fileSize: fileSize || null,
     mimeType: mimeType || null,
     replyToId: replyToId || null,
-  });
+    });
+  } catch (createError) {
+    console.error('Error creating message:', createError);
+    throw createError;
+  }
 
   // Load message with relations
   const messageWithRelations = await Message.findByPk(message.id, {

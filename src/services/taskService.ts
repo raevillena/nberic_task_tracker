@@ -1,8 +1,9 @@
 // Task service - business logic for tasks
 
-import { Transaction } from 'sequelize';
-import { Task, Study, User, Project } from '@/lib/db/models';
-import { TaskStatus, TaskPriority, UserRole } from '@/types/entities';
+import { Transaction, Op } from 'sequelize';
+import { Task, Study, User, Project, TaskRequest, TaskAssignment } from '@/lib/db/models';
+import { createNotification } from './notificationService';
+import { TaskStatus, TaskPriority, UserRole, TaskRequestType, TaskRequestStatus } from '@/types/entities';
 import { CreateTaskRequest, UpdateTaskRequest } from '@/types/api';
 import { UserContext } from '@/types/rbac';
 import { PermissionError, NotFoundError, ValidationError } from '@/lib/utils/errors';
@@ -15,31 +16,73 @@ export async function getAllTasks(user: UserContext): Promise<Task[]> {
   // Build query
   const where: any = {};
 
-  // Researchers can only see assigned tasks
+  // Researchers can only see assigned tasks (check both legacy and many-to-many)
   if (user.role === UserRole.RESEARCHER) {
-    where.assignedToId = user.id;
-  }
+    try {
+      // Get task IDs from task_assignments table
+      const assignedTaskIds = await TaskAssignment.findAll({
+        where: { userId: user.id },
+        attributes: ['taskId'],
+        raw: true,
+      }).then((assignments) => assignments.map((a: any) => a.taskId));
 
-  return Task.findAll({
-    where,
-    include: [
-      { model: User, as: 'assignedTo', attributes: ['id', 'email', 'firstName', 'lastName'] },
-      { model: User, as: 'createdBy', attributes: ['id', 'email', 'firstName', 'lastName'] },
-      {
-        model: Study,
-        as: 'study',
-        attributes: ['id', 'name', 'projectId'],
-        include: [
-          {
-            model: Project,
-            as: 'project',
-            attributes: ['id', 'name'],
-          },
-        ],
-      },
-    ],
-    order: [['createdAt', 'DESC']],
-  });
+      // Use Op.or to check both assignedToId and task_assignments
+      where[Op.or] = [
+        { assignedToId: user.id },
+        ...(assignedTaskIds.length > 0 ? [{ id: { [Op.in]: assignedTaskIds } }] : []),
+      ];
+    } catch (taskAssignmentError) {
+      // Fallback to legacy assignedToId only if TaskAssignment table doesn't exist
+      where.assignedToId = user.id;
+    }
+  }
+  
+  // Build base includes (always include these)
+  const baseIncludes: any[] = [
+    { model: User, as: 'assignedTo', attributes: ['id', 'email', 'firstName', 'lastName'] },
+    { model: User, as: 'createdBy', attributes: ['id', 'email', 'firstName', 'lastName'] },
+    {
+      model: Study,
+      as: 'study',
+      attributes: ['id', 'name', 'projectId'],
+      include: [
+        {
+          model: Project,
+          as: 'project',
+          attributes: ['id', 'name'],
+        },
+      ],
+    },
+  ];
+
+  // Try to include assignedResearchers, but fallback if table doesn't exist
+  try {
+    const tasks = await Task.findAll({
+      where,
+      include: [
+        ...baseIncludes,
+        {
+          model: User,
+          as: 'assignedResearchers',
+          through: { attributes: [] },
+          attributes: ['id', 'email', 'firstName', 'lastName'],
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+    return tasks;
+  } catch (findAllError: any) {
+    // If error is about missing task_assignments table, retry without assignedResearchers include
+    if (findAllError?.message?.includes('task_assignments') || findAllError?.name === 'SequelizeDatabaseError') {
+      const tasks = await Task.findAll({
+        where,
+        include: baseIncludes,
+        order: [['createdAt', 'DESC']],
+      });
+      return tasks;
+    }
+    throw findAllError;
+  }
 }
 
 /**
@@ -58,19 +101,69 @@ export async function getTasksByStudy(
   // Build query
   const where: any = { studyId };
 
-  // Researchers can only see assigned tasks
+  // Researchers can only see assigned tasks (check both legacy and many-to-many)
   if (user.role === UserRole.RESEARCHER) {
-    where.assignedToId = user.id;
-  }
+    try {
+      // Get task IDs from task_assignments table for this study
+      const assignedTaskIds = await TaskAssignment.findAll({
+        where: { userId: user.id },
+        attributes: ['taskId'],
+        include: [
+          {
+            model: Task,
+            as: 'task',
+            attributes: [],
+            where: { studyId },
+          },
+        ],
+        raw: true,
+      }).then((assignments) => assignments.map((a: any) => a.taskId));
 
-  return Task.findAll({
-    where,
-    include: [
-      { model: User, as: 'assignedTo', attributes: ['id', 'email', 'firstName', 'lastName'] },
-      { model: User, as: 'createdBy', attributes: ['id', 'email', 'firstName', 'lastName'] },
-    ],
-    order: [['createdAt', 'DESC']],
-  });
+      // Use Op.or to check both assignedToId and task_assignments
+      where[Op.or] = [
+        { assignedToId: user.id },
+        ...(assignedTaskIds.length > 0 ? [{ id: { [Op.in]: assignedTaskIds } }] : []),
+      ];
+    } catch (taskAssignmentError) {
+      // Fallback to legacy assignedToId only if TaskAssignment table doesn't exist
+      where.assignedToId = user.id;
+    }
+  }
+  
+  // Build base includes (always include these)
+  const baseIncludes: any[] = [
+    { model: User, as: 'assignedTo', attributes: ['id', 'email', 'firstName', 'lastName'] },
+    { model: User, as: 'createdBy', attributes: ['id', 'email', 'firstName', 'lastName'] },
+  ];
+
+  // Try to include assignedResearchers, but fallback if table doesn't exist
+  try {
+    const tasks = await Task.findAll({
+      where,
+      include: [
+        ...baseIncludes,
+        {
+          model: User,
+          as: 'assignedResearchers',
+          through: { attributes: [] },
+          attributes: ['id', 'email', 'firstName', 'lastName'],
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+    return tasks;
+  } catch (findAllError: any) {
+    // If error is about missing task_assignments table, retry without assignedResearchers include
+    if (findAllError?.message?.includes('task_assignments') || findAllError?.name === 'SequelizeDatabaseError') {
+      const tasks = await Task.findAll({
+        where,
+        include: baseIncludes,
+        order: [['createdAt', 'DESC']],
+      });
+      return tasks;
+    }
+    throw findAllError;
+  }
 }
 
 /**
@@ -80,22 +173,63 @@ export async function getTaskById(
   taskId: number,
   user: UserContext
 ): Promise<Task> {
-  const task = await Task.findByPk(taskId, {
-    include: [
-      { model: Study, as: 'study', include: [{ model: User, as: 'createdBy' }] },
-      { model: User, as: 'assignedTo' },
-      { model: User, as: 'createdBy' },
-      { model: User, as: 'completedBy' },
-    ],
-  });
+  // Build base includes (always include these)
+  const baseIncludes: any[] = [
+    { 
+      model: Study, 
+      as: 'study', 
+      include: [
+        { model: User, as: 'createdBy' },
+        {
+          model: Project,
+          as: 'project',
+          attributes: ['id', 'name'],
+        },
+      ],
+    },
+    { model: User, as: 'assignedTo' },
+    { model: User, as: 'createdBy' },
+    { model: User, as: 'completedBy' },
+  ];
+
+  // Try to include assignedResearchers, but fallback if table doesn't exist
+  let task: Task | null;
+  try {
+    task = await Task.findByPk(taskId, {
+      include: [
+        ...baseIncludes,
+        {
+          model: User,
+          as: 'assignedResearchers',
+          through: { attributes: [] },
+          attributes: ['id', 'email', 'firstName', 'lastName'],
+        },
+      ],
+    });
+  } catch (findError: any) {
+    // If error is about missing task_assignments table, retry without assignedResearchers include
+    if (findError?.message?.includes('task_assignments') || findError?.name === 'SequelizeDatabaseError') {
+      task = await Task.findByPk(taskId, {
+        include: baseIncludes,
+      });
+    } else {
+      throw findError;
+    }
+  }
 
   if (!task) {
     throw new NotFoundError(`Task ${taskId} not found`);
   }
 
-  // Researchers can only access assigned tasks
-  if (user.role === UserRole.RESEARCHER && task.assignedToId !== user.id) {
-    throw new PermissionError('You do not have access to this task');
+  // Researchers can only access assigned tasks (check both legacy and new assignments)
+  if (user.role === UserRole.RESEARCHER) {
+    const isAssigned = 
+      task.assignedToId === user.id ||
+      (task.assignedResearchers && task.assignedResearchers.some((u) => u.id === user.id));
+    
+    if (!isAssigned) {
+      throw new PermissionError('You do not have access to this task');
+    }
   }
 
   return task;
@@ -149,13 +283,33 @@ export async function createTask(
   // Update progress chain (uses same transaction if provided)
   await progressService.updateProgressChain(task.studyId, transaction);
 
-  return task.reload({
-    include: [
-      { model: User, as: 'assignedTo' },
-      { model: User, as: 'createdBy' },
-    ],
-    transaction,
-  });
+  // Try to reload with assignedResearchers, fallback if table doesn't exist
+  try {
+    return await task.reload({
+      include: [
+        { model: User, as: 'assignedTo' },
+        {
+          model: User,
+          as: 'assignedResearchers',
+          through: { attributes: [] },
+        },
+        { model: User, as: 'createdBy' },
+      ],
+      transaction,
+    });
+  } catch (reloadError: any) {
+    // If error is about missing task_assignments table, retry without assignedResearchers include
+    if (reloadError?.message?.includes('task_assignments') || reloadError?.name === 'SequelizeDatabaseError') {
+      return await task.reload({
+        include: [
+          { model: User, as: 'assignedTo' },
+          { model: User, as: 'createdBy' },
+        ],
+        transaction,
+      });
+    }
+    throw reloadError;
+  }
 }
 
 /**
@@ -173,13 +327,25 @@ export async function updateTask(
 
   // Researchers can only update their assigned tasks (limited fields)
   if (user.role === UserRole.RESEARCHER) {
-    if (task.assignedToId !== user.id) {
+    // Check both legacy and many-to-many assignments
+    let isAssigned = task.assignedToId === user.id;
+    
+    // Try to check task_assignments table, but fallback if it doesn't exist
+    if (!isAssigned) {
+      try {
+        const assignment = await TaskAssignment.findOne({ where: { taskId: task.id, userId: user.id } });
+        isAssigned = assignment !== null;
+      } catch (assignmentError: any) {
+        // If table doesn't exist, just use legacy assignedToId check
+        // isAssigned already set above
+      }
+    }
+    
+    if (!isAssigned) {
       throw new PermissionError('You do not have access to this task');
     }
-    // Researchers cannot change status to completed, assign, or change priority
-    if (data.status === TaskStatus.COMPLETED) {
-      throw new PermissionError('Researchers cannot complete tasks');
-    }
+    // Researchers cannot assign tasks or change priority (but can complete via completeTask function)
+    // Note: Researchers can update status to completed via the form, but it's better to use the complete button
     if (data.assignedToId !== undefined) {
       throw new PermissionError('Researchers cannot assign tasks');
     }
@@ -211,17 +377,37 @@ export async function updateTask(
     await progressService.updateProgressChain(task.studyId);
   }
 
-  return task.reload({
-    include: [
-      { model: User, as: 'assignedTo' },
-      { model: User, as: 'createdBy' },
-      { model: User, as: 'completedBy' },
-    ],
-  });
+  // Try to reload with assignedResearchers, fallback if table doesn't exist
+  try {
+    return await task.reload({
+      include: [
+        { model: User, as: 'assignedTo' },
+        {
+          model: User,
+          as: 'assignedResearchers',
+          through: { attributes: [] },
+        },
+        { model: User, as: 'createdBy' },
+        { model: User, as: 'completedBy' },
+      ],
+    });
+  } catch (reloadError: any) {
+    // If error is about missing task_assignments table, retry without assignedResearchers include
+    if (reloadError?.message?.includes('task_assignments') || reloadError?.name === 'SequelizeDatabaseError') {
+      return await task.reload({
+        include: [
+          { model: User, as: 'assignedTo' },
+          { model: User, as: 'createdBy' },
+          { model: User, as: 'completedBy' },
+        ],
+      });
+    }
+    throw reloadError;
+  }
 }
 
 /**
- * Complete a task (Manager only)
+ * Complete a task (Managers and assigned Researchers)
  * Uses transaction to ensure progress calculation is atomic
  */
 export async function completeTask(
@@ -229,9 +415,48 @@ export async function completeTask(
   user: UserContext,
   transaction?: Transaction
 ): Promise<Task> {
-  // Only managers can complete tasks
-  if (user.role !== UserRole.MANAGER) {
-    throw new PermissionError('Only managers can complete tasks');
+  // Managers can complete any task, researchers can only complete assigned tasks
+  if (user.role === UserRole.RESEARCHER) {
+    // Try to load task with assignedResearchers, fallback if table doesn't exist
+    let task: Task | null;
+    try {
+      task = await Task.findByPk(taskId, {
+        include: [
+          { model: User, as: 'assignedTo' },
+          {
+            model: User,
+            as: 'assignedResearchers',
+            through: { attributes: [] },
+          },
+        ],
+        transaction,
+      });
+    } catch (findError: any) {
+      // If error is about missing task_assignments table, retry without assignedResearchers include
+      if (findError?.message?.includes('task_assignments') || findError?.name === 'SequelizeDatabaseError') {
+        task = await Task.findByPk(taskId, {
+          include: [
+            { model: User, as: 'assignedTo' },
+          ],
+          transaction,
+        });
+      } else {
+        throw findError;
+      }
+    }
+
+    if (!task) {
+      throw new NotFoundError(`Task ${taskId} not found`);
+    }
+
+    // Check if user is assigned to this task
+    const isAssigned = 
+      task.assignedToId === user.id ||
+      (task.assignedResearchers && task.assignedResearchers.some((u) => u.id === user.id));
+
+    if (!isAssigned) {
+      throw new PermissionError('You can only complete tasks assigned to you');
+    }
   }
 
   const task = await Task.findByPk(taskId, { transaction });
@@ -260,51 +485,48 @@ export async function completeTask(
   // Update progress chain (uses same transaction if provided)
   await progressService.updateProgressChain(task.studyId, transaction);
 
-  return task.reload({
-    include: [
-      { model: User, as: 'assignedTo' },
-      { model: User, as: 'createdBy' },
-      { model: User, as: 'completedBy' },
-    ],
-    transaction,
-  });
+  // Try to reload with assignedResearchers, fallback if table doesn't exist
+  try {
+    return await task.reload({
+      include: [
+        { model: User, as: 'assignedTo' },
+        {
+          model: User,
+          as: 'assignedResearchers',
+          through: { attributes: [] },
+        },
+        { model: User, as: 'createdBy' },
+        { model: User, as: 'completedBy' },
+      ],
+      transaction,
+    });
+  } catch (reloadError: any) {
+    // If error is about missing task_assignments table, retry without assignedResearchers include
+    if (reloadError?.message?.includes('task_assignments') || reloadError?.name === 'SequelizeDatabaseError') {
+      return await task.reload({
+        include: [
+          { model: User, as: 'assignedTo' },
+          { model: User, as: 'createdBy' },
+          { model: User, as: 'completedBy' },
+        ],
+        transaction,
+      });
+    }
+    throw reloadError;
+  }
 }
 
 /**
  * Assign a task to a researcher (Manager only)
+ * This function maintains backward compatibility by updating both assignedToId and task_assignments
  */
 export async function assignTask(
   taskId: number,
   assignedToId: number,
   user: UserContext
 ): Promise<Task> {
-  // Only managers can assign tasks
-  if (user.role !== UserRole.MANAGER) {
-    throw new PermissionError('Only managers can assign tasks');
-  }
-
-  const task = await Task.findByPk(taskId);
-  if (!task) {
-    throw new NotFoundError(`Task ${taskId} not found`);
-  }
-
-  // Verify assigned user exists and is a researcher
-  const assignedUser = await User.findByPk(assignedToId);
-  if (!assignedUser) {
-    throw new NotFoundError(`User ${assignedToId} not found`);
-  }
-  if (assignedUser.role !== UserRole.RESEARCHER) {
-    throw new ValidationError('Tasks can only be assigned to researchers');
-  }
-
-  await task.update({ assignedToId });
-
-  return task.reload({
-    include: [
-      { model: User, as: 'assignedTo' },
-      { model: User, as: 'createdBy' },
-    ],
-  });
+  // Use the multiple assignment function with a single user
+  return assignTaskToMultiple(taskId, [assignedToId], user);
 }
 
 /**
@@ -331,4 +553,716 @@ export async function deleteTask(
 
   // Update progress chain (uses same transaction if provided)
   await progressService.updateProgressChain(studyId, transaction);
+}
+
+
+/**
+ * Request task completion (Researcher only)
+ * Researchers can request managers to mark tasks as completed
+ */
+export async function requestTaskCompletion(
+  taskId: number,
+  user: UserContext,
+  notes?: string
+): Promise<TaskRequest> {
+  // Only researchers can request completion
+  if (user.role !== UserRole.RESEARCHER) {
+    throw new PermissionError('Only researchers can request task completion');
+  }
+
+  // Try to load task with assignedResearchers, fallback if table doesn't exist
+  let task: Task | null;
+  try {
+    task = await Task.findByPk(taskId, {
+      include: [
+        { model: User, as: 'assignedTo' },
+        {
+          model: User,
+          as: 'assignedResearchers',
+          through: { attributes: [] },
+        },
+      ],
+    });
+  } catch (findError: any) {
+    // If error is about missing task_assignments table, retry without assignedResearchers include
+    if (findError?.message?.includes('task_assignments') || findError?.name === 'SequelizeDatabaseError') {
+      task = await Task.findByPk(taskId, {
+        include: [
+          { model: User, as: 'assignedTo' },
+        ],
+      });
+    } else {
+      throw findError;
+    }
+  }
+
+  if (!task) {
+    throw new NotFoundError(`Task ${taskId} not found`);
+  }
+
+  // Check if user is assigned to this task
+  const isAssigned = 
+    task.assignedToId === user.id ||
+    (task.assignedResearchers && task.assignedResearchers.some((u) => u.id === user.id));
+
+  if (!isAssigned) {
+    throw new PermissionError('You can only request completion for tasks assigned to you');
+  }
+
+  if (task.status === TaskStatus.COMPLETED) {
+    throw new ValidationError('Task is already completed');
+  }
+
+  // Check if there's already a pending completion request
+  const existingRequest = await TaskRequest.findOne({
+    where: {
+      taskId,
+      requestedById: user.id,
+      requestType: TaskRequestType.COMPLETION,
+      status: TaskRequestStatus.PENDING,
+    },
+  });
+
+  if (existingRequest) {
+    throw new ValidationError('You already have a pending completion request for this task');
+  }
+
+  // Create the request
+  const request = await TaskRequest.create({
+    taskId,
+    requestedById: user.id,
+    requestType: TaskRequestType.COMPLETION,
+    status: TaskRequestStatus.PENDING,
+    notes: notes || null,
+  });
+
+  // #region agent log
+  const fs = require('fs');
+  const path = require('path');
+  const logPath = path.join(process.cwd(), '.cursor', 'debug.log');
+  try {
+    fs.appendFileSync(logPath, `[REQUEST-COMPLETION] Request created: id=${request.id}, taskId=${taskId}, requestedById=${user.id}\n`);
+  } catch {}
+  // #endregion
+
+  try {
+    const reloadedRequest = await request.reload({
+      include: [
+        { 
+          model: Task, 
+          as: 'task',
+          include: [
+            { model: User, as: 'createdBy' }, // Include the manager who created the task
+            {
+              model: Study,
+              as: 'study',
+              attributes: ['id', 'projectId'], // Include study to get projectId
+            },
+          ],
+        },
+        { model: User, as: 'requestedBy' },
+      ],
+    });
+    // #region agent log
+    try {
+      const taskData = reloadedRequest.task as any;
+      fs.appendFileSync(logPath, `[REQUEST-COMPLETION] Request reloaded: task.createdById=${taskData?.createdById}, task.study.projectId=${taskData?.study?.projectId}\n`);
+    } catch {}
+    // #endregion
+    
+    // Create notification in database for the manager who created the task
+    if (reloadedRequest.task?.createdById) {
+      const taskData = reloadedRequest.task as any;
+      const requesterName = reloadedRequest.requestedBy
+        ? `${reloadedRequest.requestedBy.firstName} ${reloadedRequest.requestedBy.lastName}`
+        : 'A researcher';
+      
+      createNotification(reloadedRequest.task.createdById, {
+        type: 'task',
+        title: 'New completion request',
+        message: `${requesterName} requested completion for task "${reloadedRequest.task.name}"`,
+        taskId: reloadedRequest.taskId,
+        projectId: taskData?.study?.projectId,
+        studyId: reloadedRequest.task.studyId,
+        senderId: reloadedRequest.requestedById,
+        senderName: requesterName,
+        actionUrl: '/dashboard/requests',
+        timestamp: new Date(reloadedRequest.createdAt),
+      }).catch((err) => {
+        console.error('Failed to create notification for task request:', err);
+      });
+    }
+    
+    return reloadedRequest;
+  } catch (reloadError: any) {
+    // #region agent log
+    const fs = require('fs');
+    const path = require('path');
+    const logPath = path.join(process.cwd(), '.cursor', 'debug.log');
+    try {
+      fs.appendFileSync(logPath, `[REQUEST-COMPLETION] Reload error: ${reloadError?.message || reloadError}\nStack: ${reloadError?.stack || 'N/A'}\n`);
+    } catch {}
+    // #endregion
+    // Fallback: reload without study include if it fails
+    try {
+      return await request.reload({
+        include: [
+          { 
+            model: Task, 
+            as: 'task',
+            include: [
+              { model: User, as: 'createdBy' },
+            ],
+          },
+          { model: User, as: 'requestedBy' },
+        ],
+      });
+    } catch (fallbackError: any) {
+      // #region agent log
+      try {
+        fs.appendFileSync(logPath, `[REQUEST-COMPLETION] Fallback reload error: ${fallbackError?.message || fallbackError}\n`);
+      } catch {}
+      // #endregion
+      throw reloadError; // Throw original error
+    }
+  }
+}
+
+/**
+ * Request task reassignment (Researcher only)
+ * Researchers can request managers to reassign tasks to other researchers
+ */
+export async function requestTaskReassignment(
+  taskId: number,
+  requestedAssignedToId: number,
+  user: UserContext,
+  notes?: string
+): Promise<TaskRequest> {
+  // Only researchers can request reassignment
+  if (user.role !== UserRole.RESEARCHER) {
+    throw new PermissionError('Only researchers can request task reassignment');
+  }
+
+  // Try to load task with assignedResearchers, fallback if table doesn't exist
+  let task: Task | null;
+  try {
+    task = await Task.findByPk(taskId, {
+      include: [
+        { model: User, as: 'assignedTo' },
+        {
+          model: User,
+          as: 'assignedResearchers',
+          through: { attributes: [] },
+        },
+      ],
+    });
+  } catch (findError: any) {
+    // If error is about missing task_assignments table, retry without assignedResearchers include
+    if (findError?.message?.includes('task_assignments') || findError?.name === 'SequelizeDatabaseError') {
+      task = await Task.findByPk(taskId, {
+        include: [
+          { model: User, as: 'assignedTo' },
+        ],
+      });
+    } else {
+      throw findError;
+    }
+  }
+
+  if (!task) {
+    throw new NotFoundError(`Task ${taskId} not found`);
+  }
+
+  // Check if user is assigned to this task
+  const isAssigned = 
+    task.assignedToId === user.id ||
+    (task.assignedResearchers && task.assignedResearchers.some((u) => u.id === user.id));
+
+  if (!isAssigned) {
+    throw new PermissionError('You can only request reassignment for tasks assigned to you');
+  }
+
+  // Verify requested user exists and is a researcher
+  const requestedUser = await User.findByPk(requestedAssignedToId);
+  if (!requestedUser) {
+    throw new NotFoundError(`User ${requestedAssignedToId} not found`);
+  }
+  if (requestedUser.role !== UserRole.RESEARCHER) {
+    throw new ValidationError('Tasks can only be reassigned to researchers');
+  }
+
+  if (requestedAssignedToId === user.id) {
+    throw new ValidationError('Cannot request reassignment to yourself');
+  }
+
+  // Check if there's already a pending reassignment request
+  const existingRequest = await TaskRequest.findOne({
+    where: {
+      taskId,
+      requestedById: user.id,
+      requestType: TaskRequestType.REASSIGNMENT,
+      status: TaskRequestStatus.PENDING,
+    },
+  });
+
+  if (existingRequest) {
+    throw new ValidationError('You already have a pending reassignment request for this task');
+  }
+
+  // Create the request
+  const request = await TaskRequest.create({
+    taskId,
+    requestedById: user.id,
+    requestType: TaskRequestType.REASSIGNMENT,
+    requestedAssignedToId,
+    status: TaskRequestStatus.PENDING,
+    notes: notes || null,
+  });
+
+  try {
+    const reloadedRequest = await request.reload({
+      include: [
+        { 
+          model: Task, 
+          as: 'task',
+          include: [
+            { model: User, as: 'createdBy' }, // Include the manager who created the task
+            {
+              model: Study,
+              as: 'study',
+              attributes: ['id', 'projectId'], // Include study to get projectId
+            },
+          ],
+        },
+        { model: User, as: 'requestedBy' },
+        { model: User, as: 'requestedAssignedTo' },
+      ],
+    });
+    
+    // Create notification in database for the manager who created the task
+    if (reloadedRequest.task?.createdById) {
+      const taskData = reloadedRequest.task as any;
+      const requesterName = reloadedRequest.requestedBy
+        ? `${reloadedRequest.requestedBy.firstName} ${reloadedRequest.requestedBy.lastName}`
+        : 'A researcher';
+      
+      createNotification(reloadedRequest.task.createdById, {
+        type: 'task',
+        title: 'New reassignment request',
+        message: `${requesterName} requested reassignment for task "${reloadedRequest.task.name}"`,
+        taskId: reloadedRequest.taskId,
+        projectId: taskData?.study?.projectId,
+        studyId: reloadedRequest.task.studyId,
+        senderId: reloadedRequest.requestedById,
+        senderName: requesterName,
+        actionUrl: '/dashboard/requests',
+        timestamp: new Date(reloadedRequest.createdAt),
+      }).catch((err) => {
+        console.error('Failed to create notification for task request:', err);
+      });
+    }
+    
+    return reloadedRequest;
+  } catch (reloadError: any) {
+    // #region agent log
+    const fs = require('fs');
+    const path = require('path');
+    const logPath = path.join(process.cwd(), '.cursor', 'debug.log');
+    try {
+      fs.appendFileSync(logPath, `[REQUEST-REASSIGNMENT] Reload error: ${reloadError?.message || reloadError}\nStack: ${reloadError?.stack || 'N/A'}\n`);
+    } catch {}
+    // #endregion
+    // Fallback: reload without study include if it fails
+    try {
+      return await request.reload({
+        include: [
+          { 
+            model: Task, 
+            as: 'task',
+            include: [
+              { model: User, as: 'createdBy' },
+            ],
+          },
+          { model: User, as: 'requestedBy' },
+          { model: User, as: 'requestedAssignedTo' },
+        ],
+      });
+    } catch (fallbackError: any) {
+      // #region agent log
+      try {
+        fs.appendFileSync(logPath, `[REQUEST-REASSIGNMENT] Fallback reload error: ${fallbackError?.message || fallbackError}\n`);
+      } catch {}
+      // #endregion
+      throw reloadError; // Throw original error
+    }
+  }
+}
+
+/**
+ * Approve a task request (Manager only)
+ */
+export async function approveTaskRequest(
+  requestId: number,
+  user: UserContext,
+  transaction?: Transaction
+): Promise<{ request: TaskRequest; task: Task }> {
+  // Only managers can approve requests
+  if (user.role !== UserRole.MANAGER) {
+    throw new PermissionError('Only managers can approve task requests');
+  }
+
+  const request = await TaskRequest.findByPk(requestId, {
+    include: [
+      { model: Task, as: 'task' },
+      { model: User, as: 'requestedBy' },
+      { model: User, as: 'requestedAssignedTo' },
+    ],
+    transaction,
+  });
+
+  if (!request) {
+    throw new NotFoundError(`Request ${requestId} not found`);
+  }
+
+  if (request.status !== TaskRequestStatus.PENDING) {
+    throw new ValidationError('Request has already been processed');
+  }
+
+  const task = request.task!;
+
+  // Process the request based on type
+  if (request.requestType === TaskRequestType.COMPLETION) {
+    // Update request status first
+    await request.update(
+      {
+        status: TaskRequestStatus.APPROVED,
+        reviewedById: user.id,
+        reviewedAt: new Date(),
+      },
+      { transaction }
+    );
+    
+    // Check if task is already completed
+    if (task.status === TaskStatus.COMPLETED) {
+      // Task is already completed - skip task update but still approve the request
+      // This handles the edge case where task was completed through another flow
+      // Add a note to the request indicating the task was already completed
+      const existingNotes = request.notes || '';
+      const completionNote = 'Note: Task was already completed when this request was approved.';
+      const updatedNotes = existingNotes 
+        ? `${existingNotes}\n${completionNote}`
+        : completionNote;
+      
+      await request.update(
+        {
+          notes: updatedNotes,
+        },
+        { transaction }
+      );
+      
+      // Reload task to get latest state with all associations
+      let reloadedTask: Task;
+      try {
+        reloadedTask = await task.reload({
+          include: [
+            { model: User, as: 'assignedTo' },
+            {
+              model: User,
+              as: 'assignedResearchers',
+              through: { attributes: [] },
+            },
+            { model: User, as: 'createdBy' },
+            { model: User, as: 'completedBy' },
+          ],
+          transaction,
+        });
+      } catch (reloadError: any) {
+        // If error is about missing task_assignments table, retry without assignedResearchers include
+        if (reloadError?.message?.includes('task_assignments') || reloadError?.name === 'SequelizeDatabaseError') {
+          reloadedTask = await task.reload({
+            include: [
+              { model: User, as: 'assignedTo' },
+              { model: User, as: 'createdBy' },
+              { model: User, as: 'completedBy' },
+            ],
+            transaction,
+          });
+        } else {
+          throw reloadError;
+        }
+      }
+      
+      return {
+        request: await request.reload({ transaction }),
+        task: reloadedTask,
+      };
+    }
+    
+    // Check if task is in a state that prevents completion
+    if (task.status === TaskStatus.CANCELLED) {
+      throw new ValidationError('Cannot complete a cancelled task');
+    }
+    
+    // Task is not completed - proceed with normal completion flow
+    // Complete the task
+    const updateResult = await task.update(
+      {
+        status: TaskStatus.COMPLETED,
+        completedAt: new Date(),
+        completedById: user.id,
+      },
+      { transaction }
+    );
+    
+    // Verify the update succeeded
+    if (!updateResult) {
+      throw new Error('Failed to update task status to completed');
+    }
+    
+    await progressService.updateProgressChain(task.studyId, transaction);
+  } else if (request.requestType === TaskRequestType.REASSIGNMENT) {
+    // Update request status first
+    await request.update(
+      {
+        status: TaskRequestStatus.APPROVED,
+        reviewedById: user.id,
+        reviewedAt: new Date(),
+      },
+      { transaction }
+    );
+    // Reassign the task
+    if (!request.requestedAssignedToId) {
+      throw new ValidationError('Reassignment request missing target user');
+    }
+
+    // Remove old assignments and add new one (only if table exists)
+    try {
+      await TaskAssignment.destroy({
+        where: { taskId: task.id },
+        transaction,
+      });
+
+      await TaskAssignment.create(
+        {
+          taskId: task.id,
+          userId: request.requestedAssignedToId,
+          assignedById: user.id,
+        },
+        { transaction }
+      );
+    } catch (assignmentError: any) {
+      // If table doesn't exist, just update legacy assignedToId
+      // This is fine - the migration will handle creating the table later
+      if (!assignmentError?.message?.includes('task_assignments')) {
+        throw assignmentError;
+      }
+    }
+
+    // Update legacy assignedToId for backward compatibility
+    await task.update(
+      {
+        assignedToId: request.requestedAssignedToId,
+        status: task.status === TaskStatus.PENDING ? TaskStatus.IN_PROGRESS : task.status,
+      },
+      { transaction }
+    );
+  }
+
+  // Try to reload task with assignedResearchers, fallback if table doesn't exist
+  let reloadedTask: Task;
+  try {
+    reloadedTask = await task.reload({
+      include: [
+        { model: User, as: 'assignedTo' },
+        {
+          model: User,
+          as: 'assignedResearchers',
+          through: { attributes: [] },
+        },
+        { model: User, as: 'createdBy' },
+        { model: User, as: 'completedBy' },
+      ],
+      transaction,
+    });
+  } catch (reloadError: any) {
+    // If error is about missing task_assignments table, retry without assignedResearchers include
+    if (reloadError?.message?.includes('task_assignments') || reloadError?.name === 'SequelizeDatabaseError') {
+      reloadedTask = await task.reload({
+        include: [
+          { model: User, as: 'assignedTo' },
+          { model: User, as: 'createdBy' },
+          { model: User, as: 'completedBy' },
+        ],
+        transaction,
+      });
+    } else {
+      throw reloadError;
+    }
+  }
+
+  // Verify task status was updated correctly for completion requests
+  if (request.requestType === TaskRequestType.COMPLETION) {
+    if (reloadedTask.status !== TaskStatus.COMPLETED) {
+      throw new Error(`Task status update failed. Expected COMPLETED, got ${reloadedTask.status}`);
+    }
+  }
+
+  return {
+    request: await request.reload({ transaction }),
+    task: reloadedTask,
+  };
+}
+
+/**
+ * Reject a task request (Manager only)
+ */
+export async function rejectTaskRequest(
+  requestId: number,
+  user: UserContext,
+  notes?: string
+): Promise<TaskRequest> {
+  // Only managers can reject requests
+  if (user.role !== UserRole.MANAGER) {
+    throw new PermissionError('Only managers can reject task requests');
+  }
+
+  const request = await TaskRequest.findByPk(requestId);
+
+  if (!request) {
+    throw new NotFoundError(`Request ${requestId} not found`);
+  }
+
+  if (request.status !== TaskRequestStatus.PENDING) {
+    throw new ValidationError('Request has already been processed');
+  }
+
+  // Update request status
+  await request.update({
+    status: TaskRequestStatus.REJECTED,
+    reviewedById: user.id,
+    reviewedAt: new Date(),
+    notes: notes || request.notes,
+  });
+
+  return request.reload({
+    include: [
+      { model: Task, as: 'task' },
+      { model: User, as: 'requestedBy' },
+      { model: User, as: 'requestedAssignedTo' },
+      { model: User, as: 'reviewedBy' },
+    ],
+  });
+}
+
+/**
+ * Assign a task to multiple researchers (Manager only)
+ */
+export async function assignTaskToMultiple(
+  taskId: number,
+  userIds: number[],
+  user: UserContext,
+  transaction?: Transaction
+): Promise<Task> {
+  // Only managers can assign tasks
+  if (user.role !== UserRole.MANAGER) {
+    throw new PermissionError('Only managers can assign tasks');
+  }
+
+  const task = await Task.findByPk(taskId, { transaction });
+  if (!task) {
+    throw new NotFoundError(`Task ${taskId} not found`);
+  }
+
+  // Verify all users exist and are researchers
+  const users = await User.findAll({
+    where: { id: userIds },
+    transaction,
+  });
+
+  if (users.length !== userIds.length) {
+    throw new NotFoundError('One or more users not found');
+  }
+
+  const nonResearchers = users.filter((u) => u.role !== UserRole.RESEARCHER);
+  if (nonResearchers.length > 0) {
+    throw new ValidationError('Tasks can only be assigned to researchers');
+  }
+
+  // Remove existing assignments and create new ones (only if table exists)
+  try {
+    await TaskAssignment.destroy({
+      where: { taskId },
+      transaction,
+    });
+
+    // Create new assignments
+    if (userIds.length > 0) {
+      await TaskAssignment.bulkCreate(
+        userIds.map((userId) => ({
+          taskId,
+          userId,
+          assignedById: user.id,
+        })),
+        { transaction }
+      );
+    }
+  } catch (assignmentError: any) {
+    // If table doesn't exist, just update legacy assignedToId
+    // This is fine - the migration will handle creating the table later
+    if (!assignmentError?.message?.includes('task_assignments')) {
+      throw assignmentError;
+    }
+  }
+
+  // Update legacy assignedToId for backward compatibility (always do this)
+  if (userIds.length > 0) {
+    await task.update(
+      {
+        assignedToId: userIds[0],
+        status: task.status === TaskStatus.PENDING ? TaskStatus.IN_PROGRESS : task.status,
+      },
+      { transaction }
+    );
+  } else {
+    // If no assignments, clear assignedToId
+    await task.update({ assignedToId: null }, { transaction });
+  }
+
+  // Try to reload with assignedResearchers, fallback if table doesn't exist
+  try {
+    return await task.reload({
+      include: [
+        { model: User, as: 'assignedTo' },
+        {
+          model: User,
+          as: 'assignedResearchers',
+          through: { attributes: [] },
+        },
+        { model: User, as: 'createdBy' },
+        {
+          model: Study,
+          as: 'study',
+          attributes: ['id', 'projectId'],
+        },
+      ],
+      transaction,
+    });
+  } catch (reloadError: any) {
+    // If error is about missing task_assignments table, retry without assignedResearchers include
+    if (reloadError?.message?.includes('task_assignments') || reloadError?.name === 'SequelizeDatabaseError') {
+      return await task.reload({
+        include: [
+          { model: User, as: 'assignedTo' },
+          { model: User, as: 'createdBy' },
+          {
+            model: Study,
+            as: 'study',
+            attributes: ['id', 'projectId'],
+          },
+        ],
+        transaction,
+      });
+    }
+    throw reloadError;
+  }
 }

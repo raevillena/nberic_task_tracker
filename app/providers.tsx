@@ -7,6 +7,7 @@ import { store } from '@/store';
 import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { initializeAuth } from '@/store/slices/authSlice';
+import { fetchNotificationsThunk } from '@/store/slices/notificationSlice';
 import { setupTokenRefresh, stopTokenRefresh } from '@/lib/auth/tokenRefresh';
 import type { AppDispatch } from '@/store';
 
@@ -16,6 +17,9 @@ function AuthInitializer({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Initialize auth from localStorage
     dispatch(initializeAuth());
+    
+    // Fetch notifications from database
+    dispatch(fetchNotificationsThunk());
     
     // Setup proactive token refresh
     setupTokenRefresh(store);

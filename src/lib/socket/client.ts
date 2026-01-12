@@ -26,6 +26,7 @@ import {
   removeTypingUser,
 } from '@/store/slices/messagesSlice';
 import { addNotification } from '@/store/slices/notificationSlice';
+import { UserRole } from '@/types/entities';
 import { updateTaskFromSocket } from '@/store/slices/taskSlice';
 import {
   updateProgressFromSocket,
@@ -250,6 +251,41 @@ export function initializeSocketClient(
 
   socket.on('task:assigned', (data) => {
     console.log('Task assigned via socket:', data);
+    const state = getState?.();
+    const currentUserId = state?.auth?.user?.id;
+    
+    // Only notify if current user is in the assignedUserIds list
+    if (currentUserId && data.assignedUserIds?.includes(currentUserId)) {
+      const taskName = data.task?.name || 'Task';
+      const creatorName = data.createdBy
+        ? `${data.createdBy.firstName} ${data.createdBy.lastName}`
+        : 'A manager';
+      
+      // Build action URL to the task
+      const actionUrl =
+        data.task?.projectId && data.task?.studyId
+          ? `/dashboard/projects/${data.task.projectId}/studies/${data.task.studyId}/tasks/${data.task.id}`
+          : `/dashboard/tasks?highlight=${data.task.id}`;
+      
+      dispatch(
+        addNotification({
+          id: `task-assigned-${data.task.id}-${currentUserId}-${Date.now()}`,
+          type: 'task',
+          title: 'New Task Assigned',
+          message: `${creatorName} assigned you to task "${taskName}"`,
+          taskId: data.task.id,
+          projectId: data.task.projectId,
+          studyId: data.task.studyId,
+          senderId: data.task.createdById,
+          senderName: creatorName,
+          timestamp: new Date(),
+          read: false,
+          actionUrl,
+        })
+      );
+    }
+    
+    // Update task in Redux store
     dispatch(updateTaskFromSocket(data.task));
   });
 
@@ -287,6 +323,141 @@ export function initializeSocketClient(
     );
   });
 
+  // Task request event handlers
+  socket.on('task-request:created', (data) => {
+    console.log('Task request created via socket:', data);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/e852ecc4-6e60-4763-9b73-f1b441565d96',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:292',message:'task-request:created received',data:{requestId:data.request?.id,taskId:data.request?.taskId,taskCreatedById:data.task?.createdById},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    const state = getState?.();
+    const currentUserId = state?.auth?.user?.id;
+    const currentUserRole = state?.auth?.user?.role;
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/e852ecc4-6e60-4763-9b73-f1b441565d96',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:298',message:'Checking manager match',data:{currentUserId,currentUserRole,taskCreatedById:data.task?.createdById,isMatch:currentUserRole === UserRole.MANAGER && currentUserId && data.task?.createdById === currentUserId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
+    // Only notify the manager who created the task (task.createdById)
+    // Check if current user is a manager AND is the creator of the task
+    const isTaskManager = 
+      currentUserRole === UserRole.MANAGER && 
+      currentUserId && 
+      data.task?.createdById === currentUserId;
+
+    if (isTaskManager) {
+      const requestTypeLabel =
+        data.request.requestType === 'completion'
+          ? 'completion'
+          : 'reassignment';
+      const taskName = data.task?.name || 'Task';
+      const requesterName = data.requestedBy
+        ? `${data.requestedBy.firstName} ${data.requestedBy.lastName}`
+        : 'A researcher';
+
+      // Build action URL to task requests page
+      const actionUrl = '/dashboard/requests';
+
+      dispatch(
+        addNotification({
+          id: `task-request-created-${data.request.id}-${Date.now()}`,
+          type: 'task',
+          title: `New ${requestTypeLabel} request`,
+          message: `${requesterName} requested ${requestTypeLabel} for task "${taskName}"`,
+          taskId: data.request.taskId,
+          projectId: data.task?.projectId,
+          studyId: data.task?.studyId,
+          senderId: data.request.requestedById,
+          senderName: requesterName,
+          timestamp: new Date(data.request.createdAt),
+          read: false,
+          actionUrl,
+        })
+      );
+    }
+  });
+
+  socket.on('task-request:approved', (data) => {
+    console.log('Task request approved via socket:', data);
+    const state = getState?.();
+    const currentUserId = state?.auth?.user?.id;
+
+    // Only notify the researcher who made the request
+    if (currentUserId === data.request.requestedById) {
+      const requestTypeLabel =
+        data.request.requestType === 'completion'
+          ? 'completion'
+          : 'reassignment';
+      const taskName = data.task?.name || 'Task';
+      const reviewerName = data.reviewedBy
+        ? `${data.reviewedBy.firstName} ${data.reviewedBy.lastName}`
+        : 'Manager';
+
+      // Build action URL to the task
+      const actionUrl =
+        data.task?.projectId && data.task?.studyId
+          ? `/dashboard/projects/${data.task.projectId}/studies/${data.task.studyId}/tasks/${data.request.taskId}`
+          : `/dashboard/tasks?highlight=${data.request.taskId}`;
+
+      dispatch(
+        addNotification({
+          id: `task-request-approved-${data.request.id}-${Date.now()}`,
+          type: 'task',
+          title: `${requestTypeLabel} request approved`,
+          message: `${reviewerName} approved your ${requestTypeLabel} request for task "${taskName}"`,
+          taskId: data.request.taskId,
+          projectId: data.task?.projectId,
+          studyId: data.task?.studyId,
+          senderId: data.reviewedBy?.id,
+          senderName: reviewerName,
+          timestamp: new Date(data.request.reviewedAt || data.request.updatedAt),
+          read: false,
+          actionUrl,
+        })
+      );
+    }
+  });
+
+  socket.on('task-request:rejected', (data) => {
+    console.log('Task request rejected via socket:', data);
+    const state = getState?.();
+    const currentUserId = state?.auth?.user?.id;
+
+    // Only notify the researcher who made the request
+    if (currentUserId === data.request.requestedById) {
+      const requestTypeLabel =
+        data.request.requestType === 'completion'
+          ? 'completion'
+          : 'reassignment';
+      const taskName = data.task?.name || 'Task';
+      const reviewerName = data.reviewedBy
+        ? `${data.reviewedBy.firstName} ${data.reviewedBy.lastName}`
+        : 'Manager';
+
+      // Build action URL to the task
+      const actionUrl =
+        data.task?.projectId && data.task?.studyId
+          ? `/dashboard/projects/${data.task.projectId}/studies/${data.task.studyId}/tasks/${data.request.taskId}`
+          : `/dashboard/tasks?highlight=${data.request.taskId}`;
+
+      dispatch(
+        addNotification({
+          id: `task-request-rejected-${data.request.id}-${Date.now()}`,
+          type: 'task',
+          title: `${requestTypeLabel} request rejected`,
+          message: `${reviewerName} rejected your ${requestTypeLabel} request for task "${taskName}"`,
+          taskId: data.request.taskId,
+          projectId: data.task?.projectId,
+          studyId: data.task?.studyId,
+          senderId: data.reviewedBy?.id,
+          senderName: reviewerName,
+          timestamp: new Date(data.request.reviewedAt || data.request.updatedAt),
+          read: false,
+          actionUrl,
+        })
+      );
+    }
+  });
+
   // Error handler
   socket.on('error', (data) => {
     console.error('Socket error:', data);
@@ -315,14 +486,23 @@ export function disconnectSocket() {
 
 /**
  * Join a room
+ * Will automatically join when socket connects if called before connection
  */
 export function joinRoom(type: MessageRoomType, id: number) {
-  if (!socket?.connected) {
-    console.error('Socket not connected');
+  if (!socket) {
+    console.warn('Socket not initialized yet');
     return;
   }
 
-  socket.emit('room:join', { type, id });
+  if (socket.connected) {
+    socket.emit('room:join', { type, id });
+  } else {
+    // Queue the join request for when socket connects
+    // Use once to avoid memory leaks
+    socket.once('connect', () => {
+      socket.emit('room:join', { type, id });
+    });
+  }
 }
 
 /**
@@ -366,7 +546,7 @@ export function sendImageMessage(
   roomType: MessageRoomType,
   roomId: number,
   content: string,
-  fileId: number,
+  fileId: number | string | undefined,
   fileName: string,
   fileSize: number,
   mimeType: string,
@@ -377,12 +557,16 @@ export function sendImageMessage(
     return;
   }
 
+  // Convert fileId to number if it's a string, or use undefined if not a valid number
+  // Since we don't have a file storage table, fileId is optional
+  const numericFileId = typeof fileId === 'string' ? undefined : fileId;
+
   socket.emit('message:send', {
     roomType,
     roomId,
     content,
     type: 'image',
-    fileId,
+    fileId: numericFileId,
     fileName,
     fileSize,
     mimeType,
@@ -397,7 +581,7 @@ export function sendFileMessage(
   roomType: MessageRoomType,
   roomId: number,
   content: string,
-  fileId: number,
+  fileId: number | string | undefined,
   fileName: string,
   fileSize: number,
   mimeType: string,
@@ -408,12 +592,16 @@ export function sendFileMessage(
     return;
   }
 
+  // Convert fileId to number if it's a string, or use undefined if not a valid number
+  // Since we don't have a file storage table, fileId is optional
+  const numericFileId = typeof fileId === 'string' ? undefined : fileId;
+
   socket.emit('message:send', {
     roomType,
     roomId,
     content,
     type: 'file',
-    fileId,
+    fileId: numericFileId,
     fileName,
     fileSize,
     mimeType,

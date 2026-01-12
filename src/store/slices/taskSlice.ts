@@ -1,6 +1,6 @@
 // Task Redux slice with normalized state and socket integration
 
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
 import { Task, TaskStatus } from '@/types/entities';
 
 /**
@@ -207,6 +207,60 @@ export const completeTaskThunk = createAsyncThunk(
       if (!response.ok) {
         const error = await response.json();
         return rejectWithValue(error.message || 'Failed to complete task');
+      }
+
+      const data = await response.json();
+      return data.data || data;
+    } catch (error) {
+      return rejectWithValue('Network error');
+    }
+  }
+);
+
+export const requestTaskCompletionThunk = createAsyncThunk(
+  'task/requestTaskCompletion',
+  async (
+    { projectId, studyId, taskId, notes }: { projectId: number; studyId: number; taskId: number; notes?: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/request-completion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ notes }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return rejectWithValue(error.message || 'Failed to request completion');
+      }
+
+      const data = await response.json();
+      return data.data || data;
+    } catch (error) {
+      return rejectWithValue('Network error');
+    }
+  }
+);
+
+export const requestTaskReassignmentThunk = createAsyncThunk(
+  'task/requestTaskReassignment',
+  async (
+    { projectId, studyId, taskId, requestedAssignedToId, notes }: { projectId: number; studyId: number; taskId: number; requestedAssignedToId: number; notes?: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/request-reassignment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ requestedAssignedToId, notes }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return rejectWithValue(error.message || 'Failed to request reassignment');
       }
 
       const data = await response.json();
@@ -467,6 +521,30 @@ const taskSlice = createSlice({
       .addCase(deleteTaskThunk.rejected, (state, action) => {
         state.isDeleting = false;
         state.error = action.payload as string;
+      })
+      // Request completion
+      .addCase(requestTaskCompletionThunk.pending, (state) => {
+        state.isUpdating = true;
+        state.error = null;
+      })
+      .addCase(requestTaskCompletionThunk.fulfilled, (state) => {
+        state.isUpdating = false;
+      })
+      .addCase(requestTaskCompletionThunk.rejected, (state, action) => {
+        state.isUpdating = false;
+        state.error = action.payload as string;
+      })
+      // Request reassignment
+      .addCase(requestTaskReassignmentThunk.pending, (state) => {
+        state.isUpdating = true;
+        state.error = null;
+      })
+      .addCase(requestTaskReassignmentThunk.fulfilled, (state) => {
+        state.isUpdating = false;
+      })
+      .addCase(requestTaskReassignmentThunk.rejected, (state, action) => {
+        state.isUpdating = false;
+        state.error = action.payload as string;
       });
   },
 });
@@ -474,22 +552,32 @@ const taskSlice = createSlice({
 export const { setCurrentTask, updateTaskFromSocket, clearError } = taskSlice.actions;
 export default taskSlice.reducer;
 
-// Selectors for normalized state
-export const selectAllTasks = (state: { task: TaskState }): Task[] => {
-  return state.task.ids.map((id) => state.task.entities[id]);
-};
+// Base selector
+const selectTaskState = (state: { task: TaskState }) => state.task;
+
+// Memoized selectors for normalized state
+export const selectAllTasks = createSelector(
+  [selectTaskState],
+  (taskState) => taskState.ids.map((id) => taskState.entities[id])
+);
 
 export const selectTaskById = (state: { task: TaskState }, taskId: number): Task | undefined => {
   return state.task.entities[taskId];
 };
 
-export const selectTasksByStudyId = (state: { task: TaskState }, studyId: number): Task[] => {
-  const taskIds = state.task.byStudyId[studyId] || [];
-  return taskIds.map((id) => state.task.entities[id]).filter(Boolean);
-};
+export const selectTasksByStudyId = createSelector(
+  [selectTaskState, (_state: { task: TaskState }, studyId: number) => studyId],
+  (taskState, studyId) => {
+    const taskIds = taskState.byStudyId[studyId] || [];
+    return taskIds.map((id) => taskState.entities[id]).filter(Boolean);
+  }
+);
 
-export const selectCurrentTask = (state: { task: TaskState }): Task | null => {
-  if (!state.task.currentTaskId) return null;
-  return state.task.entities[state.task.currentTaskId] || null;
-};
+export const selectCurrentTask = createSelector(
+  [selectTaskState],
+  (taskState) => {
+    if (!taskState.currentTaskId) return null;
+    return taskState.entities[taskState.currentTaskId] || null;
+  }
+);
 

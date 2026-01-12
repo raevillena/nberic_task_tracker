@@ -1,0 +1,117 @@
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:16
+[ROOM:JOIN] Access check result for task:16: true
+[ROOM:JOIN] User 5 successfully joined task:16, memberCount=1
+[REQUEST-COMPLETION] ERROR: You already have a pending completion request for this task
+Stack: ValidationError: You already have a pending completion request for this task
+    at requestTaskCompletion (webpack-internal:///(rsc)/./src/services/taskService.ts:755:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async POST (webpack-internal:///(rsc)/./app/api/projects/[id]/studies/[studyId]/tasks/[taskId]/request-completion/route.ts:32:29)
+    at async D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57228
+    at async eT.execute (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46851)
+    at async eT.handle (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:58760)
+    at async doRender (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\base-server.js:1366:42)
+    at async cacheEntry.responseCache.get.routeKind (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\base-server.js:1576:40)
+    at async DevServer.renderToResponseWithComponentsImpl (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\base-server.js:1496:28)
+    at async DevServer.renderPageComponent (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\base-server.js:1924:24)
+    at async DevServer.renderToResponseImpl (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\base-server.js:1962:32)
+    at async DevServer.pipeImpl (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\base-server.js:922:25)
+    at async NextNodeServer.handleCatchallRenderRequest (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\base-server.js:818:17)
+    at async D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\dev\next-dev-server.js:339:20
+    at async Span.traceAsyncFn (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\lib\router-server.js:179:21)
+    at async handleRequest (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\lib\router-server.js:359:24)
+    at async requestHandlerImpl (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\lib\router-server.js:383:13)
+    at async Server.requestListener (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\lib\start-server.js:141:13)
+[ROOM:JOIN] User 4 (Manager) attempting to join task:16
+[ROOM:JOIN] Access check result for task:16: true
+[ROOM:JOIN] User 4 successfully joined task:16, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:16
+[ROOM:JOIN] Access check result for task:16: true
+[ROOM:JOIN] User 4 successfully joined task:16, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:15
+[ROOM:JOIN] Access check result for task:15: true
+[ROOM:JOIN] User 4 successfully joined task:15, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:13
+[ROOM:JOIN] Access check result for task:13: true
+[ROOM:JOIN] User 4 successfully joined task:13, memberCount=1
+[EMIT-VIA-HTTP] Attempting to emit task:assigned to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:16
+[ROOM:JOIN] Access check result for task:16: true
+[ROOM:JOIN] User 5 successfully joined task:16, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:17
+[ROOM:JOIN] Access check result for task:17: true
+[ROOM:JOIN] User 5 successfully joined task:17, memberCount=1
+[REQUEST-COMPLETION] Request created: id=3, taskId=17, requestedById=5
+[REQUEST-COMPLETION] Request reloaded: task.createdById=4, task.study.projectId=3
+[REQUEST-COMPLETION-ROUTE] Request created, about to emit: requestId=3, task.createdById=4, task.study.projectId=3
+[EMIT-TASK-REQUEST] Emitting task-request:created, io available: false, task.createdById: 4, payload: {"request":{"id":3,"taskId":17,"requestedById":5,"requestType":"completion","requestedAssignedToId":null,"status":"pending","reviewedById":null,"reviewedAt":null,"notes":null,"createdAt":"2026-01-12T07:55:39.000Z","updatedAt":"2026-01-12T07:55:39.000Z"},"task":{"id":17,"name":"task 6","description":null,"status":"in_progress","priority":"high","dueDate":"2026-01-15","assignedToId":5,"createdById":4,"studyId":5,"projectId":3,"createdAt":"2026-01-12T07:55:01.000Z","updatedAt":"2026-01-12T07:55:02.000Z"},"requestedBy":{"id":5,"email":"researcher@demo.com","firstName":"Demo","lastName":"Researcher","role":"Researcher"}}
+[EMIT-VIA-HTTP] Attempting to emit task-request:created to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[EMIT-TASK-REQUEST] Emitted via HTTP fallback
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":3,"taskId":17,"taskCreatedById":4},"timestamp":1768204539579,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768204539579,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":3,"taskId":17,"taskCreatedById":4},"timestamp":1768204539585,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768204539585,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":3,"taskId":17,"taskCreatedById":4},"timestamp":1768204539586,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768204539586,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":3,"taskId":17,"taskCreatedById":4},"timestamp":1768204539586,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768204539586,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":3,"taskId":17,"taskCreatedById":4},"timestamp":1768204542180,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768204542181,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":3,"taskId":17,"taskCreatedById":4},"timestamp":1768204542181,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768204542181,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":3,"taskId":17,"taskCreatedById":4},"timestamp":1768204542182,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768204542182,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:17
+[ROOM:JOIN] Access check result for task:17: true
+[ROOM:JOIN] User 5 successfully joined task:17, memberCount=1
+[EMIT-VIA-HTTP] Attempting to emit task:assigned to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[ROOM:JOIN] User 4 (Manager) attempting to join task:18
+[ROOM:JOIN] Access check result for task:18: true
+[ROOM:JOIN] User 4 successfully joined task:18, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:18
+[ROOM:JOIN] Access check result for task:18: true
+[ROOM:JOIN] User 5 successfully joined task:18, memberCount=2
+[REQUEST-COMPLETION] Request created: id=4, taskId=18, requestedById=5
+[REQUEST-COMPLETION] Request reloaded: task.createdById=4, task.study.projectId=3
+[REQUEST-COMPLETION-ROUTE] Request created, about to emit: requestId=4, task.createdById=4, task.study.projectId=3
+[EMIT-TASK-REQUEST] Emitting task-request:created, io available: false, task.createdById: 4, payload: {"request":{"id":4,"taskId":18,"requestedById":5,"requestType":"completion","requestedAssignedToId":null,"status":"pending","reviewedById":null,"reviewedAt":null,"notes":null,"createdAt":"2026-01-12T08:22:54.000Z","updatedAt":"2026-01-12T08:22:54.000Z"},"task":{"id":18,"name":"study 6","description":"study 6","status":"in_progress","priority":"medium","dueDate":"2026-01-16","assignedToId":5,"createdById":4,"studyId":5,"projectId":3,"createdAt":"2026-01-12T08:22:29.000Z","updatedAt":"2026-01-12T08:22:30.000Z"},"requestedBy":{"id":5,"email":"researcher@demo.com","firstName":"Demo","lastName":"Researcher","role":"Researcher"}}
+[EMIT-VIA-HTTP] Attempting to emit task-request:created to http://localhost:3001/emit
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":4,"taskId":18,"taskCreatedById":4},"timestamp":1768206174318,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":4,"taskId":18,"taskCreatedById":4},"timestamp":1768206174321,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768206174321,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768206174319,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[EMIT-TASK-REQUEST] Emitted via HTTP fallback
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":4,"taskId":18,"taskCreatedById":4},"timestamp":1768206175475,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768206175475,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":4,"taskId":18,"taskCreatedById":4},"timestamp":1768206175476,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768206175476,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:18
+[ROOM:JOIN] Access check result for task:18: true
+[ROOM:JOIN] User 5 successfully joined task:18, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:18
+[ROOM:JOIN] Access check result for task:18: true
+[ROOM:JOIN] User 5 successfully joined task:18, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:18
+[ROOM:JOIN] Access check result for task:18: true
+[ROOM:JOIN] User 5 successfully joined task:18, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:17
+[ROOM:JOIN] Access check result for task:17: true
+[ROOM:JOIN] User 4 successfully joined task:17, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:18
+[ROOM:JOIN] Access check result for task:18: true
+[ROOM:JOIN] User 5 successfully joined task:18, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:17
+[ROOM:JOIN] Access check result for task:17: true
+[ROOM:JOIN] User 4 successfully joined task:17, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:18
+[ROOM:JOIN] Access check result for task:18: true
+[ROOM:JOIN] User 5 successfully joined task:18, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:18
+[ROOM:JOIN] Access check result for task:18: true
+[ROOM:JOIN] User 5 successfully joined task:18, memberCount=1

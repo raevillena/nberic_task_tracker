@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { useSocket } from '@/hooks/useSocket';
 import {
@@ -22,6 +22,7 @@ import {
 } from '@/store/slices/messagesSlice';
 import { selectAuthUser } from '@/store/slices/authSlice';
 import { Message, MessageType } from '@/types/socket';
+import { FileViewer } from '@/components/files/fileViewer';
 
 interface TaskChatProps {
   taskId: number;
@@ -46,15 +47,21 @@ export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps
   const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [viewerMessage, setViewerMessage] = useState<Message | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
-  // Join room when component mounts
+  // Join room when component mounts and socket is connected
   useEffect(() => {
-    joinRoom('task', taskId);
+    if (socketConnected) {
+      joinRoom('task', taskId);
+    }
 
     return () => {
-      leaveRoom('task', taskId);
+      if (socketConnected) {
+        leaveRoom('task', taskId);
+      }
     };
-  }, [taskId]);
+  }, [taskId, socketConnected]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -108,13 +115,16 @@ export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps
       const isImage = file.type.startsWith('image/');
       const messageType: MessageType = isImage ? 'image' : 'file';
 
+      // Use stored filename (UUID + extension) for file access, original name for display
+      const storedFileName = fileData.storedFileName || fileData.url?.replace('/uploads/', '') || fileData.fileName;
+
       if (isImage) {
         sendImageMessage(
           'task',
           taskId,
-          file.name,
+          file.name, // Original filename as content/description
           fileData.fileId,
-          fileData.fileName,
+          storedFileName, // Stored filename for file access
           fileData.fileSize,
           fileData.mimeType
         );
@@ -122,9 +132,9 @@ export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps
         sendFileMessage(
           'task',
           taskId,
-          file.name,
+          file.name, // Original filename as content/description
           fileData.fileId,
-          fileData.fileName,
+          storedFileName, // Stored filename for file access
           fileData.fileSize,
           fileData.mimeType
         );
@@ -146,6 +156,46 @@ export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
+
+  // Memoize file messages to prevent recalculation on every render
+  const fileMessages = useMemo(
+    () => messages.filter((m) => m.type === 'image' || m.type === 'file'),
+    [messages]
+  );
+
+  // Memoize viewer navigation state
+  const { currentViewerIndex, hasNext, hasPrevious } = useMemo(() => {
+    const index = viewerMessage
+      ? fileMessages.findIndex((m) => m.id === viewerMessage.id)
+      : -1;
+    return {
+      currentViewerIndex: index,
+      hasNext: index >= 0 && index < fileMessages.length - 1,
+      hasPrevious: index > 0,
+    };
+  }, [viewerMessage, fileMessages]);
+
+  const handleOpenViewer = useCallback((message: Message) => {
+    setViewerMessage(message);
+    setViewerOpen(true);
+  }, []);
+
+  const handleCloseViewer = useCallback(() => {
+    setViewerOpen(false);
+    setViewerMessage(null);
+  }, []);
+
+  const handleNextFile = useCallback(() => {
+    if (hasNext && currentViewerIndex >= 0) {
+      setViewerMessage(fileMessages[currentViewerIndex + 1]);
+    }
+  }, [hasNext, currentViewerIndex, fileMessages]);
+
+  const handlePreviousFile = useCallback(() => {
+    if (hasPrevious && currentViewerIndex >= 0) {
+      setViewerMessage(fileMessages[currentViewerIndex - 1]);
+    }
+  }, [hasPrevious, currentViewerIndex, fileMessages]);
 
   return (
     <div className="flex flex-col h-full border border-gray-200 rounded-lg bg-white">
@@ -195,14 +245,36 @@ export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps
                 )}
 
                 {message.type === 'image' && (
-                  <div>
+                  <div className="relative group">
                     <img
-                      src={`/api/files/${message.fileId}`}
-                      alt={message.fileName || 'Image'}
-                      className="max-w-full rounded mt-2"
+                      src={message.fileName ? `/uploads/${message.fileName}` : `/api/files/${message.fileId || ''}`}
+                      alt={message.content || 'Image'}
+                      className="max-w-full rounded mt-2 cursor-pointer hover:opacity-90 transition-opacity"
                       style={{ maxHeight: '300px' }}
+                      onClick={() => handleOpenViewer(message)}
+                      onError={(e) => {
+                        // Fallback to API route if direct upload path fails
+                        if (message.fileId) {
+                          (e.target as HTMLImageElement).src = `/api/files/${message.fileId}`;
+                        }
+                      }}
                     />
-                    {message.content && (
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 rounded p-1.5 pointer-events-none">
+                      <svg
+                        className="w-4 h-4 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                        />
+                      </svg>
+                    </div>
+                    {message.content && message.content !== message.fileName && (
                       <p className="text-sm mt-2">{message.content}</p>
                     )}
                   </div>
@@ -210,10 +282,9 @@ export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps
 
                 {message.type === 'file' && (
                   <div>
-                    <a
-                      href={`/api/files/${message.fileId}`}
-                      download={message.fileName || 'file'}
-                      className="flex items-center space-x-2 text-sm underline"
+                    <button
+                      onClick={() => handleOpenViewer(message)}
+                      className="flex items-center space-x-2 text-sm underline hover:opacity-80 transition-opacity"
                     >
                       <svg
                         className="w-5 h-5"
@@ -228,16 +299,13 @@ export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps
                           d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
                         />
                       </svg>
-                      <span>{message.fileName}</span>
+                      <span>{message.content || message.fileName}</span>
                       {message.fileSize && (
                         <span className="text-xs opacity-75">
                           ({formatFileSize(message.fileSize)})
                         </span>
                       )}
-                    </a>
-                    {message.content && (
-                      <p className="text-sm mt-2">{message.content}</p>
-                    )}
+                    </button>
                   </div>
                 )}
               </div>
@@ -360,6 +428,17 @@ export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps
           </div>
         </div>
       </div>
+
+      {/* File Viewer Modal */}
+      <FileViewer
+        message={viewerMessage}
+        isOpen={viewerOpen}
+        onClose={handleCloseViewer}
+        onNext={handleNextFile}
+        onPrevious={handlePreviousFile}
+        hasNext={hasNext}
+        hasPrevious={hasPrevious}
+      />
     </div>
   );
 }

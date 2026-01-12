@@ -66,7 +66,7 @@ export interface Task {
   description: string | null;
   status: TaskStatus;
   priority: TaskPriority;
-  assignedToId: number | null;
+  assignedToId: number | null; // Legacy field, kept for backward compatibility
   createdById: number;
   completedAt: Date | null;
   completedById: number | null;
@@ -75,8 +75,39 @@ export interface Task {
   updatedAt: Date;
   // Relations (optional, loaded via include)
   study?: Study;
-  assignedTo?: User;
+  assignedTo?: User; // Legacy relation
+  assignedResearchers?: User[]; // Many-to-many assignments
   createdBy?: User;
   completedBy?: User;
+}
+
+export enum TaskRequestType {
+  COMPLETION = 'completion',
+  REASSIGNMENT = 'reassignment',
+}
+
+export enum TaskRequestStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+}
+
+export interface TaskRequest {
+  id: number;
+  taskId: number;
+  requestedById: number;
+  requestType: TaskRequestType;
+  requestedAssignedToId: number | null;
+  status: TaskRequestStatus;
+  reviewedById: number | null;
+  reviewedAt: Date | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  // Relations (optional, loaded via include)
+  task?: Task;
+  requestedBy?: User;
+  requestedAssignedTo?: User;
+  reviewedBy?: User;
 }
 

@@ -59,6 +59,7 @@ export async function sendMessageHistory(
       nextCursor: result.nextCursor,
     });
   } catch (error) {
+    console.error('Error in sendMessageHistory:', error);
     socket.emit('error', {
       message: 'Failed to load message history',
       code: 'HISTORY_LOAD_ERROR',
@@ -128,6 +129,14 @@ export function setupMessageHandlers(socket: TypedSocket, io: TypedIO): void {
         message: message.toJSON() as MessageType,
       });
     } catch (error) {
+      // Log the actual error for debugging
+      console.error('Error in message:send handler:', error);
+      console.error('Error details:', {
+        name: error instanceof Error ? error.constructor.name : 'Unknown',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
       if (error instanceof ValidationError) {
         socket.emit('error', {
           message: error.message,
@@ -139,8 +148,10 @@ export function setupMessageHandlers(socket: TypedSocket, io: TypedIO): void {
           code: 'PERMISSION_ERROR',
         });
       } else {
+        // Include more details about the error
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         socket.emit('error', {
-          message: 'Failed to send message',
+          message: `Failed to send message: ${errorMessage}`,
           code: 'MESSAGE_SEND_ERROR',
         });
       }

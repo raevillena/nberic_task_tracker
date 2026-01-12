@@ -4,7 +4,7 @@ import { UserRole } from '@/types/entities';
 import { RBACOptions, UserContext } from '@/types/rbac';
 import { hasPermission } from './permissions';
 import { PermissionError, NotFoundError } from '@/lib/utils/errors';
-import { Task, Study, Project } from '@/lib/db/models';
+import { Task, Study, Project, TaskAssignment, User } from '@/lib/db/models';
 
 /**
  * Check if user can access a specific resource (ownership/assignment check)
@@ -24,11 +24,62 @@ export async function canAccessResource(
   // Researchers can only access assigned resources
   switch (resourceType) {
     case 'task': {
-      const task = await Task.findByPk(resourceId);
+      // Try to load task with assignedResearchers, fallback if table doesn't exist
+      let task: Task | null;
+      try {
+        task = await Task.findByPk(resourceId, {
+          include: [
+            {
+              model: User,
+              as: 'assignedResearchers',
+              through: { attributes: [] },
+            },
+          ],
+        });
+      } catch (findError: any) {
+        // If error is about missing task_assignments table, retry without assignedResearchers include
+        if (findError?.message?.includes('task_assignments') || findError?.name === 'SequelizeDatabaseError') {
+          task = await Task.findByPk(resourceId);
+        } else {
+          throw findError;
+        }
+      }
+
       if (!task) {
         throw new NotFoundError(`Task ${resourceId} not found`);
       }
-      return task.assignedToId === userId;
+
+      // Check legacy assignedToId first
+      if (task.assignedToId === userId) {
+        return true;
+      }
+
+      // Check many-to-many assignments (if loaded)
+      const taskWithResearchers = task as Task & { assignedResearchers?: Array<{ id: number }> };
+      if (taskWithResearchers.assignedResearchers !== undefined) {
+        // assignedResearchers was loaded (even if empty array)
+        const researcherIds = taskWithResearchers.assignedResearchers.map(u => u.id);
+        const hasAccess = researcherIds.includes(userId);
+        // If found in assignedResearchers, return true immediately
+        if (hasAccess) {
+          return true;
+        }
+        // If not found but association was loaded, continue to check TaskAssignment as fallback
+        // (in case of timing issues where assignment was just created but association not refreshed)
+      }
+
+      // If assignedResearchers wasn't loaded (table doesn't exist or wasn't included), also check TaskAssignment directly
+      try {
+        // Also check all assignments for this task to see what's in the table
+        const allAssignments = await TaskAssignment.findAll({
+          where: { taskId: resourceId },
+        });
+        const assignment = allAssignments.find(a => a.userId === userId);
+        return assignment !== null;
+      } catch (assignmentError: any) {
+        // If table doesn't exist, just return false (only legacy assignedToId was checked)
+        return false;
+      }
     }
 
     case 'study': {

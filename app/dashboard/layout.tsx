@@ -8,6 +8,8 @@ import { useAppSelector } from '@/store/hooks';
 import { logoutThunk } from '@/store/slices/authSlice';
 import { useAppDispatch } from '@/store/hooks';
 import Sidebar from '@/components/Sidebar';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { ToastNotifications } from '@/components/notifications/ToastNotifications';
 
 export default function DashboardLayout({
   children,
@@ -44,6 +46,7 @@ export default function DashboardLayout({
                 <h2 className="text-lg font-semibold text-gray-900">Dashboard</h2>
               </div>
               <div className="flex items-center space-x-4">
+                <NotificationBell />
                 <span className="text-sm text-gray-700 hidden sm:block">
                   {user?.firstName} {user?.lastName} ({user?.role})
                 </span>
@@ -62,6 +65,7 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+      <ToastNotifications />
     </div>
   );
 }

@@ -75,8 +75,9 @@ export async function POST(request: NextRequest) {
     const fileId = fileName.replace(`.${fileExtension}`, '');
 
     return NextResponse.json({
-      fileId,
-      fileName: file.name,
+      fileId, // UUID without extension (for API route lookup)
+      fileName: file.name, // Original filename for display
+      storedFileName: fileName, // Stored filename (UUID + extension) for file access
       fileSize: file.size,
       mimeType: file.type,
       url: `/uploads/${fileName}`,

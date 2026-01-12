@@ -1,6 +1,6 @@
 // Redux slice for managing Socket.IO messages state
 
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction, createSelector } from '@reduxjs/toolkit';
 import { Message, MessageRoomType } from '@/types/socket';
 
 // Room key format: "project:1" or "study:5"
@@ -322,39 +322,59 @@ export const {
 
 export default messagesSlice.reducer;
 
-// Selectors
-export const selectActiveRoom = (state: { messages: MessagesState }) =>
-  state.messages.activeRoom;
+// Base selectors
+const selectMessagesState = (state: { messages: MessagesState }) => state.messages;
 
-export const selectRoomMessages = (
-  state: { messages: MessagesState },
-  roomType: MessageRoomType | null,
-  roomId: number | null
-) => {
+export const selectActiveRoom = createSelector(
+  [selectMessagesState],
+  (messagesState) => messagesState.activeRoom
+);
+
+export const selectSocketConnected = createSelector(
+  [selectMessagesState],
+  (messagesState) => messagesState.socketConnected
+);
+
+export const selectSocketAuthenticated = createSelector(
+  [selectMessagesState],
+  (messagesState) => messagesState.socketAuthenticated
+);
+
+// Stable empty arrays to prevent unnecessary rerenders
+const EMPTY_MESSAGES: Message[] = [];
+const EMPTY_TYPING_USERS: number[] = [];
+
+// Memoized selector that returns room data by key
+const selectRooms = createSelector(
+  [selectMessagesState],
+  (messagesState) => messagesState.rooms
+);
+
+// Memoized selectors for room messages and typing users
+// These check the room key and return stable empty arrays when room doesn't exist
+export const selectRoomMessages = (state: { messages: MessagesState }, roomType: MessageRoomType | null, roomId: number | null): Message[] => {
   if (!roomType || !roomId) {
-    return [];
+    return EMPTY_MESSAGES;
   }
   
+  const rooms = selectRooms(state);
   const roomKey = getRoomKey(roomType, roomId);
-  return state.messages.rooms[roomKey]?.messages || [];
+  const room = rooms[roomKey];
+  
+  // Return the actual array reference from state, or stable empty array
+  return room?.messages ?? EMPTY_MESSAGES;
 };
 
-export const selectRoomTypingUsers = (
-  state: { messages: MessagesState },
-  roomType: MessageRoomType | null,
-  roomId: number | null
-) => {
+export const selectRoomTypingUsers = (state: { messages: MessagesState }, roomType: MessageRoomType | null, roomId: number | null): number[] => {
   if (!roomType || !roomId) {
-    return [];
+    return EMPTY_TYPING_USERS;
   }
   
+  const rooms = selectRooms(state);
   const roomKey = getRoomKey(roomType, roomId);
-  return state.messages.rooms[roomKey]?.typingUsers || [];
+  const room = rooms[roomKey];
+  
+  // Return the actual array reference from state, or stable empty array
+  return room?.typingUsers ?? EMPTY_TYPING_USERS;
 };
-
-export const selectSocketConnected = (state: { messages: MessagesState }) =>
-  state.messages.socketConnected;
-
-export const selectSocketAuthenticated = (state: { messages: MessagesState }) =>
-  state.messages.socketAuthenticated;
 

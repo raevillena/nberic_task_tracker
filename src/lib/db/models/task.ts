@@ -64,7 +64,7 @@ Task.init(
       allowNull: true,
     },
     status: {
-      type: DataTypes.ENUM(...Object.values(TaskStatus)),
+      type: DataTypes.ENUM('pending', 'in_progress', 'completed', 'cancelled'),
       allowNull: false,
       defaultValue: TaskStatus.PENDING,
     },

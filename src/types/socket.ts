@@ -1,6 +1,6 @@
 // Socket.IO event types
 
-import { Task, Study, Project, User } from './entities';
+import { Task, Study, Project, User, TaskRequest, TaskRequestType } from './entities';
 
 // Message types for chat/messaging
 export type MessageRoomType = 'project' | 'study' | 'task';
@@ -81,7 +81,24 @@ export interface ServerToClientEvents {
   // Task events
   'task:updated': (data: { task: Task }) => void;
   'task:completed': (data: { task: Task }) => void;
-  'task:assigned': (data: { task: Task }) => void;
+  'task:assigned': (data: { task: Task; assignedUserIds: number[]; createdBy?: User }) => void;
+  
+  // Task request events
+  'task-request:created': (data: {
+    request: TaskRequest;
+    task: Task;
+    requestedBy: User;
+  }) => void;
+  'task-request:approved': (data: {
+    request: TaskRequest;
+    task: Task;
+    reviewedBy: User;
+  }) => void;
+  'task-request:rejected': (data: {
+    request: TaskRequest;
+    task: Task;
+    reviewedBy: User;
+  }) => void;
   
   // Progress events
   'progress:task:updated': (data: {

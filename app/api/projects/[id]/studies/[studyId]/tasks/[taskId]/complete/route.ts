@@ -8,7 +8,8 @@ import { sequelize } from '@/lib/db/connection';
 /**
  * POST /api/projects/[id]/studies/[studyId]/tasks/[taskId]/complete
  * Complete a task
- * - Only Managers can complete tasks
+ * - Managers can complete any task
+ * - Researchers can complete tasks assigned to them
  * - Uses transaction to ensure progress calculation is atomic
  */
 export async function POST(

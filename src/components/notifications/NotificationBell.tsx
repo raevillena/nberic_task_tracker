@@ -13,6 +13,7 @@ import {
   markAsRead,
   markAllAsRead,
   markNotificationAsReadThunk,
+  fetchNotificationsThunk,
 } from '@/store/slices/notificationSlice';
 import { useRouter } from 'next/navigation';
 
@@ -43,11 +44,24 @@ export function NotificationBell() {
     }
   }, [isOpen, dispatch]);
 
+  // Periodic refresh of notifications from DB to keep badge count accurate
+  useEffect(() => {
+    // Refresh every 30 seconds to keep badge count accurate
+    const interval = setInterval(() => {
+      dispatch(fetchNotificationsThunk());
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [dispatch]);
+
   const handleNotificationClick = async (notification: typeof notifications[0]) => {
-    dispatch(markAsRead(notification.id));
-    // Also update in DB if it's a DB notification
     if (notification.id.startsWith('db-')) {
-      dispatch(markNotificationAsReadThunk(notification.id));
+      // DB notification: mark as read in DB, then refresh from DB
+      await dispatch(markNotificationAsReadThunk(notification.id));
+      dispatch(fetchNotificationsThunk());
+    } else {
+      // Non-DB notification: just mark as read in Redux
+      dispatch(markAsRead(notification.id));
     }
     dispatch(setBellOpen(false));
 
@@ -57,8 +71,19 @@ export function NotificationBell() {
     }
   };
 
-  const handleMarkAllRead = () => {
-    dispatch(markAllAsRead());
+  const handleMarkAllRead = async () => {
+    // Mark all DB notifications as read in DB
+    const dbNotifications = notifications.filter((n) => n.id.startsWith('db-') && !n.read);
+    for (const notification of dbNotifications) {
+      await dispatch(markNotificationAsReadThunk(notification.id));
+    }
+    // Refresh from DB to get accurate state
+    dispatch(fetchNotificationsThunk());
+    // Also mark non-DB notifications as read in Redux
+    const nonDbNotifications = notifications.filter((n) => !n.id.startsWith('db-') && !n.read);
+    nonDbNotifications.forEach((n) => {
+      dispatch(markAsRead(n.id));
+    });
   };
 
   return (

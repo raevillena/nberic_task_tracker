@@ -9,6 +9,7 @@ import {
   markAsRead,
   removeNotification,
   markNotificationAsReadThunk,
+  fetchNotificationsThunk,
 } from '@/store/slices/notificationSlice';
 import { useRouter } from 'next/navigation';
 
@@ -32,9 +33,20 @@ export function ToastNotifications() {
         clearTimeout(existingTimeout);
       }
 
-      // Set new timeout to auto-dismiss (mark as read, don't remove)
+      // Set new timeout to auto-dismiss
+      // For DB notifications, DON'T mark as read - just let toast disappear
+      // The notification will still show in the bell dropdown and badge will persist
+      // For non-DB notifications, mark as read in Redux
       const timeout = setTimeout(() => {
-        dispatch(markAsRead(notification.id));
+        if (notification.id.startsWith('db-')) {
+          // DB notification: Don't mark as read, don't remove
+          // Just let the toast disappear naturally (it will be filtered out)
+          // The notification remains unread in DB and will show in bell dropdown
+          // Badge count will persist
+        } else {
+          // Non-DB notification: mark as read in Redux
+          dispatch(markAsRead(notification.id));
+        }
         dismissTimeoutsRef.current.delete(notification.id);
       }, 5000); // 5 seconds
 
@@ -58,10 +70,15 @@ export function ToastNotifications() {
   }, [unreadToasts, dispatch]);
 
   const handleToastClick = (notification: typeof notifications[0]) => {
-    dispatch(markAsRead(notification.id));
-    // Also update in DB if it's a DB notification
     if (notification.id.startsWith('db-')) {
-      dispatch(markNotificationAsReadThunk(notification.id));
+      // DB notification: mark as read in DB, then refresh from DB
+      dispatch(markNotificationAsReadThunk(notification.id)).then(() => {
+        // Refresh notifications from DB to get accurate badge count
+        dispatch(fetchNotificationsThunk());
+      });
+    } else {
+      // Non-DB notification: just mark as read in Redux
+      dispatch(markAsRead(notification.id));
     }
 
     // Navigate to the notification's action URL
@@ -78,11 +95,15 @@ export function ToastNotifications() {
   };
 
   const handleDismiss = (notificationId: string) => {
-    // Mark as read instead of removing
-    dispatch(markAsRead(notificationId));
-    // Also update in DB if it's a DB notification
     if (notificationId.startsWith('db-')) {
-      dispatch(markNotificationAsReadThunk(notificationId));
+      // DB notification: mark as read in DB, then refresh from DB
+      dispatch(markNotificationAsReadThunk(notificationId)).then(() => {
+        // Refresh notifications from DB to get accurate badge count
+        dispatch(fetchNotificationsThunk());
+      });
+    } else {
+      // Non-DB notification: just mark as read in Redux
+      dispatch(markAsRead(notificationId));
     }
   };
 

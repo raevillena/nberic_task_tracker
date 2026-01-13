@@ -31,7 +31,12 @@ export async function GET(request: NextRequest) {
         studyId: n.studyId,
         senderId: n.senderId,
         senderName: n.senderName,
-        timestamp: n.createdAt,
+        // Ensure timestamp is always a string (ISO format) for Redux serialization
+        timestamp: n.createdAt instanceof Date 
+          ? n.createdAt.toISOString() 
+          : typeof n.createdAt === 'string' 
+          ? n.createdAt 
+          : new Date(n.createdAt).toISOString(),
         read: n.read,
         actionUrl: n.actionUrl,
       })),

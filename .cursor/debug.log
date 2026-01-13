@@ -1,117 +1,342 @@
-[ROOM:JOIN] User 5 (Researcher) attempting to join task:16
-[ROOM:JOIN] Access check result for task:16: true
-[ROOM:JOIN] User 5 successfully joined task:16, memberCount=1
-[REQUEST-COMPLETION] ERROR: You already have a pending completion request for this task
-Stack: ValidationError: You already have a pending completion request for this task
-    at requestTaskCompletion (webpack-internal:///(rsc)/./src/services/taskService.ts:755:15)
-    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
-    at async POST (webpack-internal:///(rsc)/./app/api/projects/[id]/studies/[studyId]/tasks/[taskId]/request-completion/route.ts:32:29)
-    at async D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:57228
-    at async eT.execute (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:46851)
-    at async eT.handle (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\compiled\next-server\app-route.runtime.dev.js:6:58760)
-    at async doRender (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\base-server.js:1366:42)
-    at async cacheEntry.responseCache.get.routeKind (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\base-server.js:1576:40)
-    at async DevServer.renderToResponseWithComponentsImpl (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\base-server.js:1496:28)
-    at async DevServer.renderPageComponent (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\base-server.js:1924:24)
-    at async DevServer.renderToResponseImpl (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\base-server.js:1962:32)
-    at async DevServer.pipeImpl (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\base-server.js:922:25)
-    at async NextNodeServer.handleCatchallRenderRequest (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\next-server.js:272:17)
-    at async DevServer.handleRequestImpl (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\base-server.js:818:17)
-    at async D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\dev\next-dev-server.js:339:20
-    at async Span.traceAsyncFn (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\trace\trace.js:154:20)
-    at async DevServer.handleRequest (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
-    at async invokeRender (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\lib\router-server.js:179:21)
-    at async handleRequest (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\lib\router-server.js:359:24)
-    at async requestHandlerImpl (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\lib\router-server.js:383:13)
-    at async Server.requestListener (D:\Users\Raymart\Desktop\Code\nberic_task_tracker\node_modules\next\dist\server\lib\start-server.js:141:13)
-[ROOM:JOIN] User 4 (Manager) attempting to join task:16
-[ROOM:JOIN] Access check result for task:16: true
-[ROOM:JOIN] User 4 successfully joined task:16, memberCount=2
-[ROOM:JOIN] User 4 (Manager) attempting to join task:16
-[ROOM:JOIN] Access check result for task:16: true
-[ROOM:JOIN] User 4 successfully joined task:16, memberCount=2
-[ROOM:JOIN] User 4 (Manager) attempting to join task:15
-[ROOM:JOIN] Access check result for task:15: true
-[ROOM:JOIN] User 4 successfully joined task:15, memberCount=1
-[ROOM:JOIN] User 4 (Manager) attempting to join task:13
-[ROOM:JOIN] Access check result for task:13: true
-[ROOM:JOIN] User 4 successfully joined task:13, memberCount=1
-[EMIT-VIA-HTTP] Attempting to emit task:assigned to http://localhost:3001/emit
-[EMIT-VIA-HTTP] Response status: 200, ok: true
-[ROOM:JOIN] User 5 (Researcher) attempting to join task:16
-[ROOM:JOIN] Access check result for task:16: true
-[ROOM:JOIN] User 5 successfully joined task:16, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:1
+[ROOM:JOIN] Access check result for task:1: true
+[ROOM:JOIN] User 4 successfully joined task:1, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:2
+[ROOM:JOIN] Access check result for task:2: true
+[ROOM:JOIN] User 4 successfully joined task:2, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:4
+[ROOM:JOIN] Access check result for task:4: true
+[ROOM:JOIN] User 4 successfully joined task:4, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:22
+[ROOM:JOIN] Access check result for task:22: true
+[ROOM:JOIN] User 4 successfully joined task:22, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:3
+[ROOM:JOIN] Access check result for task:3: true
+[ROOM:JOIN] User 4 successfully joined task:3, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:24
+[ROOM:JOIN] Access check result for task:24: true
+[ROOM:JOIN] User 5 successfully joined task:24, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:21
+[ROOM:JOIN] Access check result for task:21: true
+[ROOM:JOIN] User 5 successfully joined task:21, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:19
+[ROOM:JOIN] Access check result for task:19: true
+[ROOM:JOIN] User 5 successfully joined task:19, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:18
+[ROOM:JOIN] Access check result for task:18: true
+[ROOM:JOIN] User 5 successfully joined task:18, memberCount=1
 [ROOM:JOIN] User 5 (Researcher) attempting to join task:17
 [ROOM:JOIN] Access check result for task:17: true
 [ROOM:JOIN] User 5 successfully joined task:17, memberCount=1
-[REQUEST-COMPLETION] Request created: id=3, taskId=17, requestedById=5
-[REQUEST-COMPLETION] Request reloaded: task.createdById=4, task.study.projectId=3
-[REQUEST-COMPLETION-ROUTE] Request created, about to emit: requestId=3, task.createdById=4, task.study.projectId=3
-[EMIT-TASK-REQUEST] Emitting task-request:created, io available: false, task.createdById: 4, payload: {"request":{"id":3,"taskId":17,"requestedById":5,"requestType":"completion","requestedAssignedToId":null,"status":"pending","reviewedById":null,"reviewedAt":null,"notes":null,"createdAt":"2026-01-12T07:55:39.000Z","updatedAt":"2026-01-12T07:55:39.000Z"},"task":{"id":17,"name":"task 6","description":null,"status":"in_progress","priority":"high","dueDate":"2026-01-15","assignedToId":5,"createdById":4,"studyId":5,"projectId":3,"createdAt":"2026-01-12T07:55:01.000Z","updatedAt":"2026-01-12T07:55:02.000Z"},"requestedBy":{"id":5,"email":"researcher@demo.com","firstName":"Demo","lastName":"Researcher","role":"Researcher"}}
-[EMIT-VIA-HTTP] Attempting to emit task-request:created to http://localhost:3001/emit
-[EMIT-VIA-HTTP] Response status: 200, ok: true
-[EMIT-TASK-REQUEST] Emitted via HTTP fallback
-{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":3,"taskId":17,"taskCreatedById":4},"timestamp":1768204539579,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768204539579,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":3,"taskId":17,"taskCreatedById":4},"timestamp":1768204539585,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768204539585,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":3,"taskId":17,"taskCreatedById":4},"timestamp":1768204539586,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768204539586,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":3,"taskId":17,"taskCreatedById":4},"timestamp":1768204539586,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768204539586,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":3,"taskId":17,"taskCreatedById":4},"timestamp":1768204542180,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768204542181,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":3,"taskId":17,"taskCreatedById":4},"timestamp":1768204542181,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768204542181,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":3,"taskId":17,"taskCreatedById":4},"timestamp":1768204542182,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768204542182,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-[ROOM:JOIN] User 5 (Researcher) attempting to join task:17
-[ROOM:JOIN] Access check result for task:17: true
-[ROOM:JOIN] User 5 successfully joined task:17, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:24
+[ROOM:JOIN] Access check result for task:24: true
+[ROOM:JOIN] User 5 successfully joined task:24, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:20
+[ROOM:JOIN] Access check result for task:20: true
+[ROOM:JOIN] User 5 successfully joined task:20, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:23
+[ROOM:JOIN] Access check result for task:23: true
+[ROOM:JOIN] User 4 successfully joined task:23, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:22
+[ROOM:JOIN] Access check result for task:22: true
+[ROOM:JOIN] User 4 successfully joined task:22, memberCount=1
 [EMIT-VIA-HTTP] Attempting to emit task:assigned to http://localhost:3001/emit
 [EMIT-VIA-HTTP] Response status: 200, ok: true
-[ROOM:JOIN] User 4 (Manager) attempting to join task:18
-[ROOM:JOIN] Access check result for task:18: true
-[ROOM:JOIN] User 4 successfully joined task:18, memberCount=1
-[ROOM:JOIN] User 5 (Researcher) attempting to join task:18
-[ROOM:JOIN] Access check result for task:18: true
-[ROOM:JOIN] User 5 successfully joined task:18, memberCount=2
-[REQUEST-COMPLETION] Request created: id=4, taskId=18, requestedById=5
-[REQUEST-COMPLETION] Request reloaded: task.createdById=4, task.study.projectId=3
-[REQUEST-COMPLETION-ROUTE] Request created, about to emit: requestId=4, task.createdById=4, task.study.projectId=3
-[EMIT-TASK-REQUEST] Emitting task-request:created, io available: false, task.createdById: 4, payload: {"request":{"id":4,"taskId":18,"requestedById":5,"requestType":"completion","requestedAssignedToId":null,"status":"pending","reviewedById":null,"reviewedAt":null,"notes":null,"createdAt":"2026-01-12T08:22:54.000Z","updatedAt":"2026-01-12T08:22:54.000Z"},"task":{"id":18,"name":"study 6","description":"study 6","status":"in_progress","priority":"medium","dueDate":"2026-01-16","assignedToId":5,"createdById":4,"studyId":5,"projectId":3,"createdAt":"2026-01-12T08:22:29.000Z","updatedAt":"2026-01-12T08:22:30.000Z"},"requestedBy":{"id":5,"email":"researcher@demo.com","firstName":"Demo","lastName":"Researcher","role":"Researcher"}}
+[EMIT-VIA-HTTP] Attempting to emit task:assigned to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[EMIT-VIA-HTTP] Attempting to emit task:assigned to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[EMIT-VIA-HTTP] Attempting to emit task:assigned to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:25
+[ROOM:JOIN] Access check result for task:25: true
+[ROOM:JOIN] User 5 successfully joined task:25, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:26
+[ROOM:JOIN] Access check result for task:26: true
+[ROOM:JOIN] User 5 successfully joined task:26, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 4 successfully joined task:27, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 4 successfully joined task:27, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 4 successfully joined task:27, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 4 successfully joined task:27, memberCount=1
+[EMIT-VIA-HTTP] Attempting to emit task:assigned to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 5 successfully joined task:27, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 4 successfully joined task:27, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 5 successfully joined task:27, memberCount=2
+[REQUEST-COMPLETION] Request created: id=5, taskId=27, requestedById=5
+[REQUEST-COMPLETION] Request reloaded: task.createdById=4, task.study.projectId=6
+[REQUEST-COMPLETION-ROUTE] Request created, about to emit: requestId=5, task.createdById=4, task.study.projectId=6
+[EMIT-TASK-REQUEST] Emitting task-request:created, io available: false, task.createdById: 4, payload: {"request":{"id":5,"taskId":27,"requestedById":5,"requestType":"completion","requestedAssignedToId":null,"status":"pending","reviewedById":null,"reviewedAt":null,"notes":null,"createdAt":"2026-01-13T05:10:43.000Z","updatedAt":"2026-01-13T05:10:43.000Z"},"task":{"id":27,"name":"project 2 study 1 task 1","description":null,"status":"in_progress","priority":"medium","dueDate":null,"assignedToId":5,"createdById":4,"studyId":9,"projectId":6,"createdAt":"2026-01-13T05:06:01.000Z","updatedAt":"2026-01-13T05:09:53.000Z"},"requestedBy":{"id":5,"email":"researcher@demo.com","firstName":"Demo","lastName":"Researcher","role":"Researcher"}}
 [EMIT-VIA-HTTP] Attempting to emit task-request:created to http://localhost:3001/emit
-{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":4,"taskId":18,"taskCreatedById":4},"timestamp":1768206174318,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":4,"taskId":18,"taskCreatedById":4},"timestamp":1768206174321,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768206174321,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768206174319,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
 [EMIT-VIA-HTTP] Response status: 200, ok: true
 [EMIT-TASK-REQUEST] Emitted via HTTP fallback
-{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":4,"taskId":18,"taskCreatedById":4},"timestamp":1768206175475,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768206175475,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":4,"taskId":18,"taskCreatedById":4},"timestamp":1768206175476,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768206175476,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-[ROOM:JOIN] User 5 (Researcher) attempting to join task:18
-[ROOM:JOIN] Access check result for task:18: true
-[ROOM:JOIN] User 5 successfully joined task:18, memberCount=1
-[ROOM:JOIN] User 5 (Researcher) attempting to join task:18
-[ROOM:JOIN] Access check result for task:18: true
-[ROOM:JOIN] User 5 successfully joined task:18, memberCount=1
-[ROOM:JOIN] User 5 (Researcher) attempting to join task:18
-[ROOM:JOIN] Access check result for task:18: true
-[ROOM:JOIN] User 5 successfully joined task:18, memberCount=1
-[ROOM:JOIN] User 4 (Manager) attempting to join task:17
-[ROOM:JOIN] Access check result for task:17: true
-[ROOM:JOIN] User 4 successfully joined task:17, memberCount=1
-[ROOM:JOIN] User 5 (Researcher) attempting to join task:18
-[ROOM:JOIN] Access check result for task:18: true
-[ROOM:JOIN] User 5 successfully joined task:18, memberCount=1
-[ROOM:JOIN] User 4 (Manager) attempting to join task:17
-[ROOM:JOIN] Access check result for task:17: true
-[ROOM:JOIN] User 4 successfully joined task:17, memberCount=1
-[ROOM:JOIN] User 5 (Researcher) attempting to join task:18
-[ROOM:JOIN] Access check result for task:18: true
-[ROOM:JOIN] User 5 successfully joined task:18, memberCount=1
-[ROOM:JOIN] User 5 (Researcher) attempting to join task:18
-[ROOM:JOIN] Access check result for task:18: true
-[ROOM:JOIN] User 5 successfully joined task:18, memberCount=1
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":5,"taskId":27,"taskCreatedById":4},"timestamp":1768281043083,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768281043084,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":5,"taskId":27,"taskCreatedById":4},"timestamp":1768281043085,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768281043086,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":5,"taskId":27,"taskCreatedById":4},"timestamp":1768281044605,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281044605,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":5,"taskId":27,"taskCreatedById":4},"timestamp":1768281044605,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281044605,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":5,"taskId":27,"taskCreatedById":4},"timestamp":1768281044605,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281044605,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281044606,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":5,"taskId":27,"taskCreatedById":4},"timestamp":1768281044605,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+[ROOM:JOIN] User 4 (Manager) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 4 successfully joined task:27, memberCount=2
+[EMIT-VIA-HTTP] Attempting to emit task-request:rejected to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:25
+[ROOM:JOIN] Access check result for task:25: true
+[ROOM:JOIN] User 5 successfully joined task:25, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:25
+[ROOM:JOIN] Access check result for task:25: true
+[ROOM:JOIN] User 5 successfully joined task:25, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 5 successfully joined task:27, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:26
+[ROOM:JOIN] Access check result for task:26: true
+[ROOM:JOIN] User 5 successfully joined task:26, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:25
+[ROOM:JOIN] Access check result for task:25: true
+[ROOM:JOIN] User 5 successfully joined task:25, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 5 successfully joined task:27, memberCount=1
+[EMIT-TASK-REQUEST] Emitting task-request:created, io available: false, task.createdById: 4, payload: {"request":{"id":6,"taskId":27,"requestedById":5,"requestType":"reassignment","requestedAssignedToId":2,"status":"pending","reviewedById":null,"reviewedAt":null,"notes":null,"createdAt":"2026-01-13T05:11:57.000Z","updatedAt":"2026-01-13T05:11:57.000Z"},"task":{"id":27,"name":"project 2 study 1 task 1","description":null,"status":"in_progress","priority":"medium","dueDate":null,"assignedToId":5,"createdById":4,"studyId":9,"projectId":6,"createdAt":"2026-01-13T05:06:01.000Z","updatedAt":"2026-01-13T05:09:53.000Z"},"requestedBy":{"id":5,"email":"researcher@demo.com","firstName":"Demo","lastName":"Researcher","role":"Researcher"}}
+[EMIT-VIA-HTTP] Attempting to emit task-request:created to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[EMIT-TASK-REQUEST] Emitted via HTTP fallback
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":6,"taskId":27,"taskCreatedById":4},"timestamp":1768281117424,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768281117424,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":6,"taskId":27,"taskCreatedById":4},"timestamp":1768281118397,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281118397,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281118398,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":6,"taskId":27,"taskCreatedById":4},"timestamp":1768281118398,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":6,"taskId":27,"taskCreatedById":4},"timestamp":1768281118398,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":6,"taskId":27,"taskCreatedById":4},"timestamp":1768281118398,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281118398,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281118398,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":6,"taskId":27,"taskCreatedById":4},"timestamp":1768281118399,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281118399,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":6,"taskId":27,"taskCreatedById":4},"timestamp":1768281118399,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281118399,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281118399,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":6,"taskId":27,"taskCreatedById":4},"timestamp":1768281118399,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":6,"taskId":27,"taskCreatedById":4},"timestamp":1768281118399,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281118400,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":6,"taskId":27,"taskCreatedById":4},"timestamp":1768281118400,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":6,"taskId":27,"taskCreatedById":4},"timestamp":1768281118400,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281118400,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281118400,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+[EMIT-VIA-HTTP] Attempting to emit task-request:approved to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 5 successfully joined task:27, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:26
+[ROOM:JOIN] Access check result for task:26: true
+[ROOM:JOIN] User 4 successfully joined task:26, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:25
+[ROOM:JOIN] Access check result for task:25: true
+[ROOM:JOIN] User 4 successfully joined task:25, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:26
+[ROOM:JOIN] Access check result for task:26: true
+[ROOM:JOIN] User 5 successfully joined task:26, memberCount=1
+[REQUEST-COMPLETION] Request created: id=7, taskId=26, requestedById=5
+[REQUEST-COMPLETION] Request reloaded: task.createdById=4, task.study.projectId=5
+[REQUEST-COMPLETION-ROUTE] Request created, about to emit: requestId=7, task.createdById=4, task.study.projectId=5
+[EMIT-TASK-REQUEST] Emitting task-request:created, io available: false, task.createdById: 4, payload: {"request":{"id":7,"taskId":26,"requestedById":5,"requestType":"completion","requestedAssignedToId":null,"status":"pending","reviewedById":null,"reviewedAt":null,"notes":null,"createdAt":"2026-01-13T05:13:44.000Z","updatedAt":"2026-01-13T05:13:44.000Z"},"task":{"id":26,"name":"project 1 study 2 task 1","description":null,"status":"in_progress","priority":"medium","dueDate":"2026-01-29","assignedToId":2,"createdById":4,"studyId":8,"projectId":5,"createdAt":"2026-01-13T05:00:46.000Z","updatedAt":"2026-01-13T05:00:46.000Z"},"requestedBy":{"id":5,"email":"researcher@demo.com","firstName":"Demo","lastName":"Researcher","role":"Researcher"}}
+[EMIT-VIA-HTTP] Attempting to emit task-request:created to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[EMIT-TASK-REQUEST] Emitted via HTTP fallback
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":7,"taskId":26,"taskCreatedById":4},"timestamp":1768281224459,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768281224462,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768281224459,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":7,"taskId":26,"taskCreatedById":4},"timestamp":1768281224463,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768281224464,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":7,"taskId":26,"taskCreatedById":4},"timestamp":1768281224461,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":7,"taskId":26,"taskCreatedById":4},"timestamp":1768281225290,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281225290,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":7,"taskId":26,"taskCreatedById":4},"timestamp":1768281225290,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281225291,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+[EMIT-VIA-HTTP] Attempting to emit task-request:approved to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:26
+[ROOM:JOIN] Access check result for task:26: true
+[ROOM:JOIN] User 5 successfully joined task:26, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:25
+[ROOM:JOIN] Access check result for task:25: true
+[ROOM:JOIN] User 5 successfully joined task:25, memberCount=1
+[REQUEST-COMPLETION] Request created: id=8, taskId=25, requestedById=5
+[REQUEST-COMPLETION] Request reloaded: task.createdById=4, task.study.projectId=5
+[REQUEST-COMPLETION-ROUTE] Request created, about to emit: requestId=8, task.createdById=4, task.study.projectId=5
+[EMIT-TASK-REQUEST] Emitting task-request:created, io available: false, task.createdById: 4, payload: {"request":{"id":8,"taskId":25,"requestedById":5,"requestType":"completion","requestedAssignedToId":null,"status":"pending","reviewedById":null,"reviewedAt":null,"notes":null,"createdAt":"2026-01-13T05:14:08.000Z","updatedAt":"2026-01-13T05:14:08.000Z"},"task":{"id":25,"name":"project 1 study 1 task 1","description":null,"status":"in_progress","priority":"medium","dueDate":"2026-01-17","assignedToId":5,"createdById":4,"studyId":7,"projectId":5,"createdAt":"2026-01-13T04:59:52.000Z","updatedAt":"2026-01-13T04:59:53.000Z"},"requestedBy":{"id":5,"email":"researcher@demo.com","firstName":"Demo","lastName":"Researcher","role":"Researcher"}}
+[EMIT-VIA-HTTP] Attempting to emit task-request:created to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[EMIT-TASK-REQUEST] Emitted via HTTP fallback
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":8,"taskId":25,"taskCreatedById":4},"timestamp":1768281248933,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768281248933,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":8,"taskId":25,"taskCreatedById":4},"timestamp":1768281248935,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":8,"taskId":25,"taskCreatedById":4},"timestamp":1768281248937,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768281248935,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":4,"currentUserRole":"Manager","taskCreatedById":4,"isMatch":true},"timestamp":1768281248937,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":8,"taskId":25,"taskCreatedById":4},"timestamp":1768281250016,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281250016,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":8,"taskId":25,"taskCreatedById":4},"timestamp":1768281250016,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281250016,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":8,"taskId":25,"taskCreatedById":4},"timestamp":1768281250016,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281250017,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:298","message":"Checking manager match","data":{"currentUserId":5,"currentUserRole":"Researcher","taskCreatedById":4,"isMatch":false},"timestamp":1768281250017,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+{"location":"client.ts:292","message":"task-request:created received","data":{"requestId":8,"taskId":25,"taskCreatedById":4},"timestamp":1768281250017,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
+[EMIT-VIA-HTTP] Attempting to emit task-request:approved to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[ROOM:JOIN] User 4 (Manager) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 4 successfully joined task:27, memberCount=1
+[EMIT-VIA-HTTP] Attempting to emit task:assigned to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 5 successfully joined task:27, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 5 successfully joined task:27, memberCount=1
+[EMIT-VIA-HTTP] Attempting to emit task:assigned to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[EMIT-VIA-HTTP] Attempting to emit task:assigned to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[ROOM:JOIN] User 4 (Manager) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 4 successfully joined task:28, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 5 successfully joined task:28, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 4 successfully joined task:27, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:26
+[ROOM:JOIN] Access check result for task:26: true
+[ROOM:JOIN] User 4 successfully joined task:26, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 5 successfully joined task:28, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 5 successfully joined task:28, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 5 successfully joined task:28, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 4 successfully joined task:28, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 4 successfully joined task:28, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 4 successfully joined task:28, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 5 successfully joined task:28, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 4 successfully joined task:28, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 5 successfully joined task:28, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 4 successfully joined task:28, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 5 successfully joined task:28, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:25
+[ROOM:JOIN] Access check result for task:25: true
+[ROOM:JOIN] User 5 successfully joined task:25, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 5 successfully joined task:28, memberCount=1
+[EMIT-VIA-HTTP] Attempting to emit task:assigned to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[EMIT-VIA-HTTP] Attempting to emit task:assigned to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[ROOM:JOIN] User 4 (Manager) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 4 successfully joined task:29, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 5 successfully joined task:29, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 5 successfully joined task:29, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 4 successfully joined task:29, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 4 successfully joined task:29, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 4 successfully joined task:29, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 5 successfully joined task:28, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 5 successfully joined task:27, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 5 successfully joined task:29, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 5 successfully joined task:28, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 4 successfully joined task:28, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 4 successfully joined task:27, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 4 successfully joined task:29, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:29
+[ROOM:JOIN] User 4 (Manager) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 4 successfully joined task:29, memberCount=1
+[ROOM:JOIN] User 4 successfully joined task:29, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 5 successfully joined task:29, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 4 successfully joined task:28, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:25
+[ROOM:JOIN] Access check result for task:25: true
+[ROOM:JOIN] User 4 successfully joined task:25, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 4 successfully joined task:29, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 5 successfully joined task:29, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 4 successfully joined task:29, memberCount=2

@@ -182,7 +182,7 @@ export function initializeSocketClient(
           senderName: data.message.sender
             ? `${data.message.sender.firstName} ${data.message.sender.lastName}`
             : undefined,
-          timestamp: new Date(data.message.createdAt),
+          timestamp: new Date(data.message.createdAt).toISOString(),
           read: false,
           actionUrl,
         })
@@ -256,33 +256,14 @@ export function initializeSocketClient(
     
     // Only notify if current user is in the assignedUserIds list
     if (currentUserId && data.assignedUserIds?.includes(currentUserId)) {
-      const taskName = data.task?.name || 'Task';
-      const creatorName = data.createdBy
-        ? `${data.createdBy.firstName} ${data.createdBy.lastName}`
-        : 'A manager';
-      
-      // Build action URL to the task
-      const actionUrl =
-        data.task?.projectId && data.task?.studyId
-          ? `/dashboard/projects/${data.task.projectId}/studies/${data.task.studyId}/tasks/${data.task.id}`
-          : `/dashboard/tasks?highlight=${data.task.id}`;
-      
-      dispatch(
-        addNotification({
-          id: `task-assigned-${data.task.id}-${currentUserId}-${Date.now()}`,
-          type: 'task',
-          title: 'New Task Assigned',
-          message: `${creatorName} assigned you to task "${taskName}"`,
-          taskId: data.task.id,
-          projectId: data.task.projectId,
-          studyId: data.task.studyId,
-          senderId: data.task.createdById,
-          senderName: creatorName,
-          timestamp: new Date(),
-          read: false,
-          actionUrl,
-        })
-      );
+      // Don't add temporary notification - the DB notification was already created by the API route
+      // Just refresh notifications from DB to show the real notification and update badge
+      // Use a small delay to ensure DB transaction has completed (notification is created before socket emit)
+      setTimeout(() => {
+        import('@/store/slices/notificationSlice').then(({ fetchNotificationsThunk }) => {
+          dispatch(fetchNotificationsThunk());
+        });
+      }, 100); // Reduced delay since notification is created before socket emit
     }
     
     // Update task in Redux store
@@ -368,7 +349,7 @@ export function initializeSocketClient(
           studyId: data.task?.studyId,
           senderId: data.request.requestedById,
           senderName: requesterName,
-          timestamp: new Date(data.request.createdAt),
+          timestamp: new Date(data.request.createdAt).toISOString(),
           read: false,
           actionUrl,
         })
@@ -409,7 +390,7 @@ export function initializeSocketClient(
           studyId: data.task?.studyId,
           senderId: data.reviewedBy?.id,
           senderName: reviewerName,
-          timestamp: new Date(data.request.reviewedAt || data.request.updatedAt),
+          timestamp: new Date(data.request.reviewedAt || data.request.updatedAt).toISOString(),
           read: false,
           actionUrl,
         })
@@ -450,7 +431,7 @@ export function initializeSocketClient(
           studyId: data.task?.studyId,
           senderId: data.reviewedBy?.id,
           senderName: reviewerName,
-          timestamp: new Date(data.request.reviewedAt || data.request.updatedAt),
+          timestamp: new Date(data.request.reviewedAt || data.request.updatedAt).toISOString(),
           read: false,
           actionUrl,
         })

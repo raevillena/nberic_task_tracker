@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { approveTaskRequest } from '@/services/taskService';
-import { getAuthenticatedUser, createErrorResponse, getErrorStatusCode } from '../../../../middleware';
+import { getAuthenticatedUser, createErrorResponse, getErrorStatusCode } from '../../../middleware';
 import { sequelize } from '@/lib/db/connection';
 import { emitTaskRequestApproved } from '@/lib/socket/taskRequestEvents';
 import { getSocketInstance } from '@/lib/socket/instance';

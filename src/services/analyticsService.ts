@@ -231,12 +231,15 @@ export class AnalyticsService {
 
     if (user.role === UserRole.RESEARCHER) {
       // Researchers see projects that have tasks assigned to them
+      // Filter out soft-deleted projects, studies, and tasks
       whereClause.id = {
         [Op.in]: Task.sequelize!.literal(`(
           SELECT DISTINCT s.project_id
           FROM tasks t
-          INNER JOIN studies s ON s.id = t.study_id
+          INNER JOIN studies s ON s.id = t.study_id AND s.deleted_at IS NULL
+          INNER JOIN projects p ON p.id = s.project_id AND p.deleted_at IS NULL
           WHERE t.assigned_to_id = ${user.id}
+            AND t.deleted_at IS NULL
         )`),
       };
     }
@@ -595,12 +598,16 @@ export class AnalyticsService {
 
     // For Managers: show all studies (even without tasks)
     // For Researchers: show only studies with assigned tasks
+    // Filter out soft-deleted tasks, studies, and projects
     if (user.role === UserRole.RESEARCHER) {
       whereClause.id = {
         [Op.in]: Task.sequelize!.literal(`(
-          SELECT DISTINCT study_id
-          FROM tasks
-          WHERE assigned_to_id = ${user.id}
+          SELECT DISTINCT t.study_id
+          FROM tasks t
+          INNER JOIN studies s ON s.id = t.study_id AND s.deleted_at IS NULL
+          INNER JOIN projects p ON p.id = s.project_id AND p.deleted_at IS NULL
+          WHERE t.assigned_to_id = ${user.id}
+            AND t.deleted_at IS NULL
         )`),
       };
     }
@@ -1119,10 +1126,10 @@ export class AnalyticsService {
         COUNT(CASE WHEN t.due_date < NOW() AND t.status != 'completed' THEN 1 END) as overdue_tasks,
         COUNT(DISTINCT cf.id) as open_flags
       FROM projects p
-      LEFT JOIN studies s ON s.project_id = p.id
-      LEFT JOIN tasks t ON t.study_id = s.id ${taskFilter}
+      LEFT JOIN studies s ON s.project_id = p.id AND s.deleted_at IS NULL
+      LEFT JOIN tasks t ON t.study_id = s.id AND t.deleted_at IS NULL ${taskFilter}
       LEFT JOIN compliance_flags cf ON cf.task_id = t.id AND cf.status = :openStatus
-      WHERE ${projectFilter}
+      WHERE ${projectFilter} AND p.deleted_at IS NULL
       GROUP BY p.id, p.name, p.progress
       ORDER BY p.id
       `,
@@ -1216,9 +1223,12 @@ export class AnalyticsService {
     if (user.role === UserRole.RESEARCHER) {
       studyWhereClause.id = {
         [Op.in]: Task.sequelize!.literal(`(
-          SELECT DISTINCT study_id
-          FROM tasks
-          WHERE assigned_to_id = ${user.id}
+          SELECT DISTINCT t.study_id
+          FROM tasks t
+          INNER JOIN studies s ON s.id = t.study_id AND s.deleted_at IS NULL
+          INNER JOIN projects p ON p.id = s.project_id AND p.deleted_at IS NULL
+          WHERE t.assigned_to_id = ${user.id}
+            AND t.deleted_at IS NULL
         )`),
       };
     }
@@ -1233,7 +1243,9 @@ export class AnalyticsService {
           Task.sequelize!.literal(`(
             SELECT COUNT(t.id)
             FROM tasks t
+            INNER JOIN studies s ON s.id = t.study_id AND s.deleted_at IS NULL
             WHERE t.study_id = Study.id
+              AND t.deleted_at IS NULL
           )`),
           'totalTasks',
         ],
@@ -1241,8 +1253,10 @@ export class AnalyticsService {
           Task.sequelize!.literal(`(
             SELECT COUNT(t.id)
             FROM tasks t
+            INNER JOIN studies s ON s.id = t.study_id AND s.deleted_at IS NULL
             WHERE t.study_id = Study.id
-            AND t.status = '${TaskStatus.COMPLETED}'
+              AND t.deleted_at IS NULL
+              AND t.status = '${TaskStatus.COMPLETED}'
           )`),
           'completedTasks',
         ],

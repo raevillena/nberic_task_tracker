@@ -2,6 +2,7 @@
 
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../connection';
+import { Op } from 'sequelize';
 
 interface StudyAttributes {
   id: number;
@@ -10,6 +11,7 @@ interface StudyAttributes {
   description: string | null;
   progress: number; // 0-100
   createdById: number;
+  deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,6 +25,7 @@ export class Study extends Model<StudyAttributes, StudyCreationAttributes> imple
   declare description: string | null;
   declare progress: number;
   declare createdById: number;
+  declare deletedAt: Date | null;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 }
@@ -75,6 +78,11 @@ Study.init(
       onUpdate: 'CASCADE',
       onDelete: 'RESTRICT',
     },
+    deletedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+    },
     createdAt: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -104,7 +112,28 @@ Study.init(
         fields: ['progress'],
         name: 'idx_studies_progress',
       },
+      {
+        fields: ['deleted_at'],
+        name: 'idx_studies_deleted_at',
+      },
     ],
+    // Add default scope to exclude soft-deleted studies
+    defaultScope: {
+      where: {
+        deletedAt: null,
+      },
+    },
+    // Add scopes for including deleted studies
+    scopes: {
+      withDeleted: {
+        where: {},
+      },
+      onlyDeleted: {
+        where: {
+          deletedAt: { [Op.ne]: null },
+        },
+      },
+    },
   }
 );
 

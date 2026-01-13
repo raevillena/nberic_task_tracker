@@ -28,6 +28,21 @@ export async function GET(
 
     const studies = await getStudiesByProject(projectId, user);
 
+    // For researchers, add read status
+    if (user.role === 'Researcher') {
+      const studyIds = studies.map((s) => s.id);
+      const { getStudiesReadStatus } = await import('@/services/studyService');
+      const readStatus = await getStudiesReadStatus(studyIds, user.id);
+
+      // Add isRead property to each study
+      const studiesWithReadStatus = studies.map((study) => ({
+        ...study.toJSON(),
+        isRead: readStatus[study.id] || false,
+      }));
+
+      return NextResponse.json({ data: studiesWithReadStatus });
+    }
+
     return NextResponse.json({ data: studies });
   } catch (error) {
     return createErrorResponse(

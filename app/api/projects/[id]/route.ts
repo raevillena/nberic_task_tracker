@@ -69,9 +69,9 @@ export async function PUT(
 
 /**
  * DELETE /api/projects/[id]
- * Delete a project
+ * Delete a project (soft delete - moves to trash)
  * - Only Managers can delete projects
- * - Cascades to delete all studies and tasks
+ * - Projects are not permanently deleted, just moved to trash
  */
 export async function DELETE(
   request: NextRequest,

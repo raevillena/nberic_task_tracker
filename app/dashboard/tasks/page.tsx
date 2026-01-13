@@ -22,6 +22,8 @@ export default function TasksPage() {
   const projects = useAppSelector(selectAllProjects);
   const isLoading = useAppSelector((state) => state.task.isLoading);
   const isCreating = useAppSelector((state) => state.task.isCreating);
+  const isLoadingProjects = useAppSelector((state) => state.project.isLoading);
+  const isLoadingStudies = useAppSelector((state) => state.study.isLoading);
   const { user } = useAppSelector((state) => state.auth);
   
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -274,12 +276,19 @@ export default function TasksPage() {
                     className="hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <Link
-                        href={`/dashboard/projects/${task.study?.project?.id || ''}/studies/${task.studyId}/tasks/${task.id}`}
-                        className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
-                      >
-                        {task.name}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        {!(task as any).isRead && (
+                          <div className="h-2 w-2 bg-indigo-600 rounded-full flex-shrink-0" title="Unread" />
+                        )}
+                        <Link
+                          href={`/dashboard/projects/${task.study?.project?.id || ''}/studies/${task.studyId}/tasks/${task.id}`}
+                          className={`text-sm font-medium hover:text-indigo-900 ${
+                            !(task as any).isRead ? 'text-indigo-700 font-semibold' : 'text-indigo-600'
+                          }`}
+                        >
+                          {task.name}
+                        </Link>
+                      </div>
                       {task.description && (
                         <p className="text-sm text-gray-500 mt-1 line-clamp-1">{task.description}</p>
                       )}
@@ -362,42 +371,64 @@ export default function TasksPage() {
                   <label htmlFor="project" className="block text-sm font-medium text-gray-700 mb-2">
                     Project <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    id="project"
-                    value={selectedProjectId}
-                    onChange={(e) => setSelectedProjectId(e.target.value ? parseInt(e.target.value, 10) : '')}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                    disabled={isCreating}
-                  >
-                    <option value="">Select a project</option>
-                    {projects.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
+                  <div className="relative">
+                    <select
+                      id="project"
+                      value={selectedProjectId}
+                      onChange={(e) => setSelectedProjectId(e.target.value ? parseInt(e.target.value, 10) : '')}
+                      required
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={isCreating || isLoadingProjects}
+                    >
+                      <option value="">
+                        {isLoadingProjects ? 'Loading projects...' : 'Select a project'}
                       </option>
-                    ))}
-                  </select>
+                      {projects.map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
+                      ))}
+                    </select>
+                    {isLoadingProjects && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
                   <label htmlFor="study" className="block text-sm font-medium text-gray-700 mb-2">
                     Study <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    id="study"
-                    value={selectedStudyId}
-                    onChange={(e) => setSelectedStudyId(e.target.value ? parseInt(e.target.value, 10) : '')}
-                    required
-                    disabled={!selectedProjectId || isCreating}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  >
-                    <option value="">{selectedProjectId ? 'Select a study' : 'Select a project first'}</option>
-                    {availableStudies.map((study) => (
-                      <option key={study.id} value={study.id}>
-                        {study.name}
+                  <div className="relative">
+                    <select
+                      id="study"
+                      value={selectedStudyId}
+                      onChange={(e) => setSelectedStudyId(e.target.value ? parseInt(e.target.value, 10) : '')}
+                      required
+                      disabled={!selectedProjectId || isCreating || isLoadingStudies}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                      <option value="">
+                        {!selectedProjectId 
+                          ? 'Select a project first' 
+                          : isLoadingStudies 
+                          ? 'Loading studies...' 
+                          : 'Select a study'}
                       </option>
-                    ))}
-                  </select>
+                      {availableStudies.map((study) => (
+                        <option key={study.id} value={study.id}>
+                          {study.name}
+                        </option>
+                      ))}
+                    </select>
+                    {isLoadingStudies && selectedProjectId && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -455,7 +486,10 @@ export default function TasksPage() {
                   </label>
                   <div className="border border-gray-300 rounded-md max-h-48 overflow-y-auto p-2">
                     {loadingResearchers ? (
-                      <p className="text-sm text-gray-500 py-2">Loading researchers...</p>
+                      <div className="flex items-center justify-center py-4 space-x-2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+                        <p className="text-sm text-gray-500">Loading researchers...</p>
+                      </div>
                     ) : researchers.length === 0 ? (
                       <p className="text-sm text-gray-500 py-2">No researchers available</p>
                     ) : (
@@ -538,10 +572,17 @@ export default function TasksPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={isCreating || !selectedProjectId || !selectedStudyId || !taskName.trim()}
-                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isCreating || !selectedProjectId || !selectedStudyId || !taskName.trim() || isLoadingProjects || isLoadingStudies}
+                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                   >
-                    {isCreating ? 'Creating...' : 'Create Task'}
+                    {isCreating ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Creating...</span>
+                      </>
+                    ) : (
+                      <span>Create Task</span>
+                    )}
                   </button>
                 </div>
               </form>

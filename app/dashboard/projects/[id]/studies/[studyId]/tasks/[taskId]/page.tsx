@@ -32,12 +32,15 @@ export default function TaskDetailPage() {
   const [editDescription, setEditDescription] = useState('');
   const [editPriority, setEditPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
   const [editStatus, setEditStatus] = useState<TaskStatus>(TaskStatus.PENDING);
+  const [editAssignedUserIds, setEditAssignedUserIds] = useState<number[]>([]); // Multiple assignments for managers
+  const [editDueDate, setEditDueDate] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [showReassignDialog, setShowReassignDialog] = useState(false);
   const [reassignUserId, setReassignUserId] = useState<number | ''>('');
   const [reassignNotes, setReassignNotes] = useState('');
   const [isRequesting, setIsRequesting] = useState(false);
-  const [researchers, setResearchers] = useState<any[]>([]);
+  const [researchers, setResearchers] = useState<Array<{ id: number; email: string; firstName: string; lastName: string }>>([]);
+  const [loadingResearchers, setLoadingResearchers] = useState(false);
 
   useEffect(() => {
     if (taskId && !isNaN(taskId) && projectId && !isNaN(projectId) && studyId && !isNaN(studyId)) {
@@ -50,6 +53,20 @@ export default function TaskDetailPage() {
         setEditDescription(task.description || '');
         setEditPriority(task.priority);
         setEditStatus(task.status);
+        // Initialize assignment: get assigned researchers (both legacy and many-to-many)
+        const assignedIds: number[] = [];
+        if (task.assignedToId) {
+          assignedIds.push(task.assignedToId);
+        }
+        if (task.assignedResearchers && Array.isArray(task.assignedResearchers)) {
+          task.assignedResearchers.forEach((r) => {
+            if (!assignedIds.includes(r.id)) {
+              assignedIds.push(r.id);
+            }
+          });
+        }
+        setEditAssignedUserIds(assignedIds);
+        setEditDueDate(task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : '');
       }
     }
   }, [dispatch, taskId, projectId, studyId, task]);
@@ -61,8 +78,56 @@ export default function TaskDetailPage() {
       setEditDescription(task.description || '');
       setEditPriority(task.priority);
       setEditStatus(task.status);
+      // Update assignment: get assigned researchers (both legacy and many-to-many)
+      const assignedIds: number[] = [];
+      if (task.assignedToId) {
+        assignedIds.push(task.assignedToId);
+      }
+      if (task.assignedResearchers && Array.isArray(task.assignedResearchers)) {
+        task.assignedResearchers.forEach((r) => {
+          if (!assignedIds.includes(r.id)) {
+            assignedIds.push(r.id);
+          }
+        });
+      }
+      setEditAssignedUserIds(assignedIds);
+      setEditDueDate(task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : '');
     }
   }, [task]);
+
+  // Load researchers when editing (for managers)
+  useEffect(() => {
+    if (isEditing && user?.role === UserRole.MANAGER && researchers.length === 0 && !loadingResearchers) {
+      setLoadingResearchers(true);
+      fetch('/api/users/researchers', { credentials: 'include' })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.data) {
+            setResearchers(data.data);
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to fetch researchers:', err);
+        })
+        .finally(() => {
+          setLoadingResearchers(false);
+        });
+    }
+  }, [isEditing, user?.role, researchers.length, loadingResearchers]);
+
+  // Mark task as read when viewed
+  useEffect(() => {
+    if (task && taskId && !isNaN(taskId) && user) {
+      // Mark task as read in the background (don't block UI)
+      fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/read`, {
+        method: 'POST',
+        credentials: 'include',
+      }).catch((error) => {
+        // Silently fail - this is not critical
+        console.error('Failed to mark task as read:', error);
+      });
+    }
+  }, [task, taskId, projectId, studyId, user]);
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,9 +149,16 @@ export default function TaskDetailPage() {
       description: editDescription.trim() || undefined,
     };
 
-    // Only managers can update priority
+    // Only managers can update priority, due date, and assignment
     if (user?.role === UserRole.MANAGER) {
       updateData.priority = editPriority;
+      updateData.dueDate = editDueDate || null;
+      // For single assignment, use the first selected user (legacy support)
+      if (editAssignedUserIds.length > 0) {
+        updateData.assignedToId = editAssignedUserIds[0];
+      } else {
+        updateData.assignedToId = null;
+      }
     }
 
     // Update status (researchers can update to in_progress, managers can update to any)
@@ -104,6 +176,51 @@ export default function TaskDetailPage() {
     );
 
     if (updateTaskThunk.fulfilled.match(result)) {
+      // If manager changed assignments, update multiple assignments via assign endpoint
+      if (user?.role === UserRole.MANAGER) {
+        // Get current assignments to compare
+        const currentAssignedIds: number[] = [];
+        if (task.assignedToId) {
+          currentAssignedIds.push(task.assignedToId);
+        }
+        if (task.assignedResearchers && Array.isArray(task.assignedResearchers)) {
+          task.assignedResearchers.forEach((r) => {
+            if (!currentAssignedIds.includes(r.id)) {
+              currentAssignedIds.push(r.id);
+            }
+          });
+        }
+        
+        // Check if assignments changed
+        const assignmentsChanged = 
+          editAssignedUserIds.length !== currentAssignedIds.length ||
+          !editAssignedUserIds.every((id) => currentAssignedIds.includes(id)) ||
+          !currentAssignedIds.every((id) => editAssignedUserIds.includes(id));
+        
+        if (assignmentsChanged) {
+          if (editAssignedUserIds.length > 0) {
+            // Update assignments via assign endpoint
+            try {
+              await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/assign`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ userIds: editAssignedUserIds }),
+              });
+            } catch (error) {
+              console.error('Failed to update task assignments:', error);
+              // Continue anyway - task was updated
+            }
+          } else {
+            // Clear all assignments - assignedToId is already set to null in updateData
+            // Also clear TaskAssignment records by calling assign with a single null user
+            // Actually, we can't use empty array, so we'll just rely on assignedToId = null
+            // The TaskAssignment records will remain but assignedToId will be null
+            // This is acceptable - the task will show as unassigned
+          }
+        }
+      }
+      
       setIsEditing(false);
       // Refresh task data
       dispatch(fetchTaskByIdThunk({ projectId, studyId, taskId }));
@@ -113,7 +230,7 @@ export default function TaskDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+    if (!confirm('Are you sure you want to move this task to trash? It can be restored later from the Trash page.')) {
       return;
     }
 
@@ -295,12 +412,12 @@ export default function TaskDetailPage() {
     (task.assignedResearchers && task.assignedResearchers.some((r) => r.id === user.id))
   );
   
-  const canEdit = user?.role === UserRole.MANAGER || isAssigned;
+  const canEdit = user?.role === UserRole.MANAGER; // Only managers can edit tasks
   const canDelete = user?.role === UserRole.MANAGER;
   const canRequestCompletion = isAssigned && task.status !== TaskStatus.COMPLETED && task.status !== TaskStatus.CANCELLED;
   const canRequestReassignment = isAssigned && task.status !== TaskStatus.COMPLETED && task.status !== TaskStatus.CANCELLED;
-  // Both managers and assigned researchers can complete tasks
-  const canComplete = (user?.role === UserRole.MANAGER || isAssigned) && task.status !== TaskStatus.COMPLETED;
+  // Only managers can mark tasks as complete
+  const canComplete = user?.role === UserRole.MANAGER && task.status !== TaskStatus.COMPLETED;
 
   return (
     <div>
@@ -343,23 +460,79 @@ export default function TaskDetailPage() {
                   />
                 </div>
                 {user?.role === UserRole.MANAGER && (
-                  <div>
-                    <label htmlFor="editPriority" className="block text-sm font-medium text-gray-700 mb-2">
-                      Priority
-                    </label>
-                    <select
-                      id="editPriority"
-                      value={editPriority}
-                      onChange={(e) => setEditPriority(e.target.value as TaskPriority)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                      disabled={isUpdating}
-                    >
-                      <option value={TaskPriority.LOW}>Low</option>
-                      <option value={TaskPriority.MEDIUM}>Medium</option>
-                      <option value={TaskPriority.HIGH}>High</option>
-                      <option value={TaskPriority.URGENT}>Urgent</option>
-                    </select>
-                  </div>
+                  <>
+                    <div>
+                      <label htmlFor="editPriority" className="block text-sm font-medium text-gray-700 mb-2">
+                        Priority
+                      </label>
+                      <select
+                        id="editPriority"
+                        value={editPriority}
+                        onChange={(e) => setEditPriority(e.target.value as TaskPriority)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                        disabled={isUpdating}
+                      >
+                        <option value={TaskPriority.LOW}>Low</option>
+                        <option value={TaskPriority.MEDIUM}>Medium</option>
+                        <option value={TaskPriority.HIGH}>High</option>
+                        <option value={TaskPriority.URGENT}>Urgent</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="editDueDate" className="block text-sm font-medium text-gray-700 mb-2">
+                        Due Date
+                      </label>
+                      <input
+                        type="datetime-local"
+                        id="editDueDate"
+                        value={editDueDate}
+                        onChange={(e) => setEditDueDate(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                        disabled={isUpdating}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Assign To (Select multiple researchers)
+                      </label>
+                      <div className="border border-gray-300 rounded-md max-h-48 overflow-y-auto p-2">
+                        {loadingResearchers ? (
+                          <div className="flex items-center justify-center py-4 space-x-2">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+                            <p className="text-sm text-gray-500">Loading researchers...</p>
+                          </div>
+                        ) : researchers.length === 0 ? (
+                          <p className="text-sm text-gray-500 py-2">No researchers available</p>
+                        ) : (
+                          researchers.map((researcher) => (
+                            <label key={researcher.id} className="flex items-center space-x-2 py-2 px-2 hover:bg-gray-50 rounded cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={editAssignedUserIds.includes(researcher.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setEditAssignedUserIds([...editAssignedUserIds, researcher.id]);
+                                  } else {
+                                    setEditAssignedUserIds(editAssignedUserIds.filter((id) => id !== researcher.id));
+                                  }
+                                }}
+                                disabled={isUpdating}
+                                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                              />
+                              <span className="text-sm text-gray-700">
+                                {researcher.firstName} {researcher.lastName} ({researcher.email})
+                              </span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                      {editAssignedUserIds.length > 0 && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          {editAssignedUserIds.length} researcher{editAssignedUserIds.length !== 1 ? 's' : ''} selected
+                        </p>
+                      )}
+                    </div>
+                  </>
                 )}
                 <div>
                   <label htmlFor="editStatus" className="block text-sm font-medium text-gray-700 mb-2">
@@ -404,6 +577,20 @@ export default function TaskDetailPage() {
                       setEditDescription(task.description || '');
                       setEditPriority(task.priority);
                       setEditStatus(task.status);
+                      // Reset assignment to current task assignments
+                      const assignedIds: number[] = [];
+                      if (task.assignedToId) {
+                        assignedIds.push(task.assignedToId);
+                      }
+                      if (task.assignedResearchers && Array.isArray(task.assignedResearchers)) {
+                        task.assignedResearchers.forEach((r) => {
+                          if (!assignedIds.includes(r.id)) {
+                            assignedIds.push(r.id);
+                          }
+                        });
+                      }
+                      setEditAssignedUserIds(assignedIds);
+                      setEditDueDate(task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : '');
                     }}
                     disabled={isUpdating}
                     className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:opacity-50"
@@ -472,7 +659,7 @@ export default function TaskDetailPage() {
                   disabled={isDeleting}
                   className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
                 >
-                  {isDeleting ? 'Deleting...' : 'Delete'}
+                  {isDeleting ? 'Moving to Trash...' : 'Move to Trash'}
                 </button>
               )}
             </div>

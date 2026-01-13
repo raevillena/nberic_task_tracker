@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchProjectsThunk, selectAllProjects } from '@/store/slices/projectSlice';
 import { fetchStudiesByProjectThunk, selectAllStudies, createStudyThunk } from '@/store/slices/studySlice';
+import { UserRole } from '@/types/entities';
 import Link from 'next/link';
 
 export default function StudiesPage() {
@@ -24,6 +25,27 @@ export default function StudiesPage() {
   const [studyName, setStudyName] = useState('');
   const [studyDescription, setStudyDescription] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Mark study as read when clicked by researcher
+  const handleStudyClick = async (projectId: number, studyId: number) => {
+    if (user?.role === UserRole.RESEARCHER) {
+      // Mark as read in the background (don't block navigation)
+      fetch(`/api/projects/${projectId}/studies/${studyId}/read`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+        .then(() => {
+          // Trigger badge count refresh
+          window.dispatchEvent(new CustomEvent('refreshUnreadCounts'));
+        })
+        .catch((error) => {
+          // Silently fail - this is not critical
+          console.error('Failed to mark study as read:', error);
+        });
+    }
+    // Navigate to study detail
+    router.push(`/dashboard/projects/${projectId}/studies/${studyId}`);
+  };
 
   useEffect(() => {
     dispatch(fetchProjectsThunk());
@@ -121,6 +143,47 @@ export default function StudiesPage() {
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
           <p className="mt-4 text-gray-600">Loading studies...</p>
         </div>
+      ) : projects.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-md p-12 text-center">
+          <svg
+            className="mx-auto h-12 w-12 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+            />
+          </svg>
+          <h3 className="mt-4 text-lg font-medium text-gray-900">Projects Required</h3>
+          <p className="mt-2 text-sm text-gray-500">
+            {user?.role === 'Manager'
+              ? 'You need to create a project first before you can add studies. Studies are organized within projects.'
+              : 'No projects have been created yet. Please contact a manager to create a project.'}
+          </p>
+          {user?.role === 'Manager' && (
+            <div className="mt-6 flex justify-center gap-4">
+              <Link
+                href="/dashboard/projects/new"
+                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Create Project
+              </Link>
+              <Link
+                href="/dashboard/projects"
+                className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                View Projects
+              </Link>
+            </div>
+          )}
+        </div>
       ) : allStudies.length === 0 ? (
         <div className="bg-white rounded-lg shadow-md p-12 text-center">
           <svg
@@ -139,17 +202,20 @@ export default function StudiesPage() {
           <h3 className="mt-4 text-lg font-medium text-gray-900">No studies found</h3>
           <p className="mt-2 text-sm text-gray-500">
             {user?.role === 'Manager'
-              ? 'Create a project and add studies to get started.'
+              ? 'Create your first study to get started. Studies help organize tasks within your projects.'
               : 'No studies have been assigned to you yet.'}
           </p>
           {user?.role === 'Manager' && (
             <div className="mt-6">
-              <Link
-                href="/dashboard/projects"
-                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
               >
-                View Projects
-              </Link>
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Create Study
+              </button>
             </div>
           )}
         </div>
@@ -170,12 +236,23 @@ export default function StudiesPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {projectStudies.map((study) => (
-                  <Link
+                  <button
                     key={study.id}
-                    href={`/dashboard/projects/${project.id}/studies/${study.id}`}
-                    className="block p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:shadow-md transition-all"
+                    onClick={() => handleStudyClick(project.id, study.id)}
+                    className="block w-full text-left p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:shadow-md transition-all"
                   >
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{study.name}</h3>
+                    <div className="flex items-center gap-2 mb-2">
+                      {user?.role === 'Researcher' && !(study as any).isRead && (
+                        <div className="h-2 w-2 bg-indigo-600 rounded-full flex-shrink-0" title="Unread" />
+                      )}
+                      <h3 className={`text-lg font-semibold mb-0 ${
+                        user?.role === 'Researcher' && !(study as any).isRead 
+                          ? 'text-indigo-700 font-bold' 
+                          : 'text-gray-900'
+                      }`}>
+                        {study.name}
+                      </h3>
+                    </div>
                     {study.description && (
                       <p className="text-gray-600 text-sm mb-3 line-clamp-2">{study.description}</p>
                     )}
@@ -197,7 +274,7 @@ export default function StudiesPage() {
                         />
                       </div>
                     </div>
-                  </Link>
+                  </button>
                 ))}
               </div>
             </div>

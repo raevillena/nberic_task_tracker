@@ -3,6 +3,7 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../connection';
 import { TaskStatus, TaskPriority } from '@/types/entities';
+import { Op } from 'sequelize';
 
 interface TaskAttributes {
   id: number;
@@ -16,6 +17,7 @@ interface TaskAttributes {
   completedAt: Date | null;
   completedById: number | null;
   dueDate: Date | null;
+  deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,6 +36,7 @@ export class Task extends Model<TaskAttributes, TaskCreationAttributes> implemen
   declare completedAt: Date | null;
   declare completedById: number | null;
   declare dueDate: Date | null;
+  declare deletedAt: Date | null;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 }
@@ -111,6 +114,11 @@ Task.init(
       type: DataTypes.DATEONLY,
       allowNull: true,
     },
+    deletedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+    },
     createdAt: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -156,7 +164,28 @@ Task.init(
         fields: ['study_id', 'status'],
         name: 'idx_tasks_study_status',
       },
+      {
+        fields: ['deleted_at'],
+        name: 'idx_tasks_deleted_at',
+      },
     ],
+    // Add default scope to exclude soft-deleted tasks
+    defaultScope: {
+      where: {
+        deletedAt: null,
+      },
+    },
+    // Add scopes for including deleted tasks
+    scopes: {
+      withDeleted: {
+        where: {},
+      },
+      onlyDeleted: {
+        where: {
+          deletedAt: { [Op.ne]: null },
+        },
+      },
+    },
   }
 );
 

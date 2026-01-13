@@ -7,6 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchStudyByIdThunk, updateStudyThunk, deleteStudyThunk } from '@/store/slices/studySlice';
 import { fetchTasksByStudyThunk, selectTasksByStudyId, createTaskThunk } from '@/store/slices/taskSlice';
+import { fetchProjectByIdThunk } from '@/store/slices/projectSlice';
 import { addNotification } from '@/store/slices/notificationSlice';
 import { TaskStatus, TaskPriority, UserRole } from '@/types/entities';
 import Link from 'next/link';
@@ -20,6 +21,9 @@ export default function StudyDetailPage() {
 
   const study = useAppSelector((state) =>
     studyId && !isNaN(studyId) ? state.study.entities[studyId] : undefined
+  );
+  const project = useAppSelector((state) =>
+    projectId && !isNaN(projectId) ? state.project.entities[projectId] : undefined
   );
   const isLoading = useAppSelector((state) => state.study.isLoading);
   const isUpdating = useAppSelector((state) => state.study.isUpdating);
@@ -51,6 +55,10 @@ export default function StudyDetailPage() {
 
   useEffect(() => {
     if (studyId && !isNaN(studyId) && projectId && !isNaN(projectId)) {
+      // Fetch project if not already in state
+      if (!project) {
+        dispatch(fetchProjectByIdThunk(projectId));
+      }
       // Only fetch if study is not already in state
       if (!study) {
         dispatch(fetchStudyByIdThunk({ projectId, studyId }));
@@ -62,7 +70,7 @@ export default function StudyDetailPage() {
       // Always fetch tasks for this study
       dispatch(fetchTasksByStudyThunk(studyId));
     }
-  }, [dispatch, studyId, projectId, study]);
+  }, [dispatch, studyId, projectId, study, project]);
 
   // Update edit form when study changes
   useEffect(() => {
@@ -71,6 +79,20 @@ export default function StudyDetailPage() {
       setEditDescription(study.description || '');
     }
   }, [study]);
+
+  // Mark study as read when viewed by researcher
+  useEffect(() => {
+    if (study && studyId && !isNaN(studyId) && projectId && !isNaN(projectId) && user?.role === UserRole.RESEARCHER) {
+      // Mark study as read in the background (don't block UI)
+      fetch(`/api/projects/${projectId}/studies/${studyId}/read`, {
+        method: 'POST',
+        credentials: 'include',
+      }).catch((error) => {
+        // Silently fail - this is not critical
+        console.error('Failed to mark study as read:', error);
+      });
+    }
+  }, [study, studyId, projectId, user]);
 
   // Fetch researchers when modal opens
   useEffect(() => {
@@ -122,7 +144,7 @@ export default function StudyDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this study? This will also delete all associated tasks. This action cannot be undone.')) {
+    if (!confirm('Are you sure you want to move this study to trash? It can be restored later from the Trash page.')) {
       return;
     }
 
@@ -378,7 +400,7 @@ export default function StudyDetailPage() {
                   disabled={isDeleting}
                   className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
                 >
-                  {isDeleting ? 'Deleting...' : 'Delete'}
+                  {isDeleting ? 'Moving to Trash...' : 'Move to Trash'}
                 </button>
               )}
             </div>
@@ -396,7 +418,7 @@ export default function StudyDetailPage() {
                 href={`/dashboard/projects/${projectId}`}
                 className="text-indigo-600 hover:text-indigo-700"
               >
-                {study.project?.name || 'Unknown Project'}
+                {project?.name || study.project?.name || 'Unknown Project'}
               </Link>
             </dd>
           </div>
@@ -496,12 +518,19 @@ export default function StudyDetailPage() {
                   {tasks.map((task) => (
                     <tr key={task.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <Link
-                          href={`/dashboard/projects/${projectId}/studies/${studyId}/tasks/${task.id}`}
-                          className="text-sm font-medium text-indigo-600 hover:text-indigo-900"
-                        >
-                          {task.name}
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          {!(task as any).isRead && (
+                            <div className="h-2 w-2 bg-indigo-600 rounded-full flex-shrink-0" title="Unread" />
+                          )}
+                          <Link
+                            href={`/dashboard/projects/${projectId}/studies/${studyId}/tasks/${task.id}`}
+                            className={`text-sm font-medium hover:text-indigo-900 ${
+                              !(task as any).isRead ? 'text-indigo-700 font-semibold' : 'text-indigo-600'
+                            }`}
+                          >
+                            {task.name}
+                          </Link>
+                        </div>
                         {task.description && (
                           <p className="text-sm text-gray-500 mt-1 line-clamp-1">{task.description}</p>
                         )}
@@ -633,7 +662,10 @@ export default function StudyDetailPage() {
                   </label>
                   <div className="border border-gray-300 rounded-md max-h-48 overflow-y-auto p-2">
                     {loadingResearchers ? (
-                      <p className="text-sm text-gray-500 py-2">Loading researchers...</p>
+                      <div className="flex items-center justify-center py-4 space-x-2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+                        <p className="text-sm text-gray-500">Loading researchers...</p>
+                      </div>
                     ) : researchers.length === 0 ? (
                       <p className="text-sm text-gray-500 py-2">No researchers available</p>
                     ) : (
@@ -715,9 +747,16 @@ export default function StudyDetailPage() {
                   <button
                     type="submit"
                     disabled={isCreatingTask || !taskName.trim()}
-                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                   >
-                    {isCreatingTask ? 'Creating...' : 'Create Task'}
+                    {isCreatingTask ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Creating...</span>
+                      </>
+                    ) : (
+                      <span>Create Task</span>
+                    )}
                   </button>
                 </div>
               </form>

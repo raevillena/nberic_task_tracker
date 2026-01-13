@@ -9,6 +9,7 @@ import { logoutThunk } from '@/store/slices/authSlice';
 import { useAppDispatch } from '@/store/hooks';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { ToastNotifications } from '@/components/notifications/ToastNotifications';
+import { useSocket } from '@/hooks/useSocket';
 
 export default function DashboardLayout({
   children,
@@ -18,6 +19,9 @@ export default function DashboardLayout({
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  
+  // Initialize socket connection for real-time notifications
+  useSocket();
 
   useEffect(() => {
     if (!isAuthenticated) {

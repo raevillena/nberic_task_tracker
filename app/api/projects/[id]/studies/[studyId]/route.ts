@@ -69,9 +69,9 @@ export async function PUT(
 
 /**
  * DELETE /api/projects/[id]/studies/[studyId]
- * Delete a study
+ * Delete a study (soft delete - moves to trash)
  * - Only Managers can delete studies
- * - Cascades to delete all tasks
+ * - Studies are not permanently deleted, just moved to trash
  */
 export async function DELETE(
   request: NextRequest,

@@ -2,6 +2,7 @@
 
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../connection';
+import { Op } from 'sequelize';
 
 interface ProjectAttributes {
   id: number;
@@ -9,6 +10,7 @@ interface ProjectAttributes {
   description: string | null;
   progress: number; // 0-100
   createdById: number;
+  deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +23,7 @@ export class Project extends Model<ProjectAttributes, ProjectCreationAttributes>
   declare description: string | null;
   declare progress: number;
   declare createdById: number;
+  declare deletedAt: Date | null;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 }
@@ -63,6 +66,11 @@ Project.init(
       onUpdate: 'CASCADE',
       onDelete: 'RESTRICT',
     },
+    deletedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+    },
     createdAt: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -92,7 +100,28 @@ Project.init(
         fields: ['created_at'],
         name: 'idx_projects_created_at',
       },
+      {
+        fields: ['deleted_at'],
+        name: 'idx_projects_deleted_at',
+      },
     ],
+    // Add default scope to exclude soft-deleted projects
+    defaultScope: {
+      where: {
+        deletedAt: null,
+      },
+    },
+    // Add scopes for including deleted projects
+    scopes: {
+      withDeleted: {
+        where: {},
+      },
+      onlyDeleted: {
+        where: {
+          deletedAt: { [Op.ne]: null },
+        },
+      },
+    },
   }
 );
 

@@ -1,13 +1,14 @@
 // Task service - business logic for tasks
 
 import { Transaction, Op } from 'sequelize';
-import { Task, Study, User, Project, TaskRequest, TaskAssignment } from '@/lib/db/models';
+import { Task, Study, User, Project, TaskRequest, TaskAssignment, TaskRead } from '@/lib/db/models';
 import { createNotification } from './notificationService';
 import { TaskStatus, TaskPriority, UserRole, TaskRequestType, TaskRequestStatus } from '@/types/entities';
 import { CreateTaskRequest, UpdateTaskRequest } from '@/types/api';
 import { UserContext } from '@/types/rbac';
 import { PermissionError, NotFoundError, ValidationError } from '@/lib/utils/errors';
 import { progressService } from './progressService';
+import { sequelize } from '@/lib/db/connection';
 
 /**
  * Get all tasks (with RBAC filtering)
@@ -134,6 +135,18 @@ export async function getTasksByStudy(
   const baseIncludes: any[] = [
     { model: User, as: 'assignedTo', attributes: ['id', 'email', 'firstName', 'lastName'] },
     { model: User, as: 'createdBy', attributes: ['id', 'email', 'firstName', 'lastName'] },
+    {
+      model: Study,
+      as: 'study',
+      attributes: ['id', 'name', 'projectId'],
+      include: [
+        {
+          model: Project,
+          as: 'project',
+          attributes: ['id', 'name'],
+        },
+      ],
+    },
   ];
 
   // Try to include assignedResearchers, but fallback if table doesn't exist
@@ -530,7 +543,7 @@ export async function assignTask(
 }
 
 /**
- * Delete a task (Manager only)
+ * Delete a task (soft delete - moves to trash) (Manager only)
  */
 export async function deleteTask(
   taskId: number,
@@ -542,17 +555,74 @@ export async function deleteTask(
     throw new PermissionError('Only managers can delete tasks');
   }
 
-  const task = await Task.findByPk(taskId, { transaction });
+  const task = await Task.scope('withDeleted').findByPk(taskId, { transaction });
   if (!task) {
     throw new NotFoundError(`Task ${taskId} not found`);
   }
 
   const studyId = task.studyId;
 
-  await task.destroy({ transaction });
+  // Soft delete - set deletedAt timestamp
+  await task.update({ deletedAt: new Date() }, { transaction });
 
   // Update progress chain (uses same transaction if provided)
   await progressService.updateProgressChain(studyId, transaction);
+}
+
+/**
+ * Restore a task from trash
+ */
+export async function restoreTask(
+  taskId: number,
+  user: UserContext
+): Promise<Task> {
+  // Only managers can restore tasks
+  if (user.role !== UserRole.MANAGER) {
+    throw new PermissionError('Only managers can restore tasks');
+  }
+
+  const task = await Task.scope('withDeleted').findByPk(taskId);
+  if (!task) {
+    throw new NotFoundError(`Task ${taskId} not found`);
+  }
+
+  if (!task.deletedAt) {
+    throw new Error('Task is not in trash');
+  }
+
+  // Restore - clear deletedAt
+  await task.update({ deletedAt: null });
+  await task.reload({ 
+    include: [
+      { model: Study, as: 'study', attributes: ['id', 'name', 'projectId'] },
+      { model: User, as: 'createdBy', attributes: ['id', 'email', 'firstName', 'lastName'] },
+    ] 
+  });
+  
+  // Update progress chain after restoration
+  await progressService.updateProgressChain(task.studyId);
+  
+  return task;
+}
+
+/**
+ * Get all tasks in trash (deleted tasks)
+ */
+export async function getTrashTasks(user: UserContext): Promise<Task[]> {
+  // Only managers can view trash
+  if (user.role !== UserRole.MANAGER) {
+    throw new PermissionError('Only managers can view trash');
+  }
+
+  const tasks = await Task.scope('onlyDeleted').findAll({
+    include: [
+      { model: Study, as: 'study', attributes: ['id', 'name', 'projectId'], include: [{ model: Project, as: 'project', attributes: ['id', 'name'] }] },
+      { model: User, as: 'createdBy', attributes: ['id', 'email', 'firstName', 'lastName'] },
+    ],
+    order: [['deletedAt', 'DESC']],
+  });
+
+  return tasks;
 }
 
 
@@ -1264,5 +1334,164 @@ export async function assignTaskToMultiple(
       });
     }
     throw reloadError;
+  }
+}
+
+/**
+ * Mark a task as read for a user
+ */
+export async function markTaskAsRead(taskId: number, userId: number): Promise<void> {
+  try {
+    // Use findOrCreate to avoid duplicates (unique constraint handles this, but we check first)
+    await TaskRead.findOrCreate({
+      where: {
+        taskId,
+        userId,
+      },
+      defaults: {
+        taskId,
+        userId,
+        readAt: new Date(),
+      },
+    });
+  } catch (error: any) {
+    // If record already exists, update readAt timestamp
+    if (error?.name === 'SequelizeUniqueConstraintError') {
+      await TaskRead.update(
+        { readAt: new Date() },
+        {
+          where: {
+            taskId,
+            userId,
+          },
+        }
+      );
+    } else {
+      throw error;
+    }
+  }
+}
+
+/**
+ * Check if a task is read for a user
+ */
+export async function isTaskRead(taskId: number, userId: number): Promise<boolean> {
+  try {
+    const taskRead = await TaskRead.findOne({
+      where: {
+        taskId,
+        userId,
+      },
+    });
+    return !!taskRead;
+  } catch (error) {
+    // If table doesn't exist yet, return false (task is unread)
+    return false;
+  }
+}
+
+/**
+ * Get unread task count for a user
+ * This counts tasks assigned to the user that haven't been read yet
+ */
+export async function getUnreadTaskCount(userId: number, userRole: UserRole): Promise<number> {
+  try {
+    // Use a single optimized query with JOINs to get all data at once
+    // Explicitly filter out deleted projects, studies, and tasks
+    const query = `
+      SELECT DISTINCT t.id as task_id
+      FROM tasks t
+      INNER JOIN studies s ON s.id = t.study_id AND s.deleted_at IS NULL
+      INNER JOIN projects p ON p.id = s.project_id AND p.deleted_at IS NULL
+      LEFT JOIN task_assignments ta ON ta.task_id = t.id AND ta.user_id = :userId
+      WHERE t.deleted_at IS NULL
+        AND s.deleted_at IS NULL
+        AND p.deleted_at IS NULL
+        AND (
+          t.assigned_to_id = :userId
+          OR ta.user_id = :userId
+        )
+    `;
+
+    const results = await sequelize.query(query, {
+      replacements: { userId },
+      type: sequelize.QueryTypes.SELECT,
+    }) as any[];
+
+    const assignedTaskIds = results.map((r: any) => r.task_id || r.taskId).filter(Boolean);
+
+    if (assignedTaskIds.length === 0) {
+      return 0;
+    }
+
+    // Double-check: Verify that all task IDs are from non-deleted tasks
+    // This is an extra safety check to ensure deleted tasks are not counted
+    const validTasks = await Task.findAll({
+      where: {
+        id: { [Op.in]: assignedTaskIds },
+        deletedAt: null,
+      },
+      attributes: ['id'],
+      raw: true,
+    });
+    const validTaskIds = new Set(validTasks.map((t: any) => t.id || t.task_id).filter(Boolean));
+
+    // Filter taskIds to only include valid (non-deleted) tasks
+    const validTaskIdsArray = assignedTaskIds.filter((id) => validTaskIds.has(id));
+
+    if (validTaskIdsArray.length === 0) {
+      return 0;
+    }
+
+    // Get read task IDs for this user
+    const readTaskIds = await TaskRead.findAll({
+      where: {
+        userId,
+        taskId: { [Op.in]: validTaskIdsArray },
+      },
+      attributes: ['taskId'],
+      raw: true,
+    }).then((reads) => reads.map((r: any) => r.taskId || r.task_id).filter(Boolean));
+
+    // Count unread tasks (only from valid, non-deleted tasks)
+    const unreadTaskIds = validTaskIdsArray.filter((id) => !readTaskIds.includes(id));
+    return unreadTaskIds.length;
+  } catch (error: any) {
+    // If TaskRead table doesn't exist yet, return 0
+    console.error('[getUnreadTaskCount] Error:', error?.message || error);
+    return 0;
+  }
+}
+
+/**
+ * Get read status for multiple tasks for a user
+ * Returns a map of taskId -> boolean (true if read)
+ */
+export async function getTasksReadStatus(taskIds: number[], userId: number): Promise<Record<number, boolean>> {
+  try {
+    const taskReads = await TaskRead.findAll({
+      where: {
+        taskId: { [Op.in]: taskIds },
+        userId,
+      },
+      attributes: ['taskId'],
+      raw: true,
+    });
+
+    const readTaskIds = new Set(taskReads.map((r: any) => r.taskId));
+    const statusMap: Record<number, boolean> = {};
+    
+    taskIds.forEach((taskId) => {
+      statusMap[taskId] = readTaskIds.has(taskId);
+    });
+
+    return statusMap;
+  } catch (error) {
+    // If TaskRead table doesn't exist yet, return all false
+    const statusMap: Record<number, boolean> = {};
+    taskIds.forEach((taskId) => {
+      statusMap[taskId] = false;
+    });
+    return statusMap;
   }
 }

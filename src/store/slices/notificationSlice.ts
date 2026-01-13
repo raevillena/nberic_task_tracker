@@ -15,7 +15,8 @@ export interface Notification {
   studyId?: number;
   senderId?: number;
   senderName?: string;
-  timestamp: Date;
+  // Store as string for Redux serialization (ISO format)
+  timestamp: string;
   read: boolean;
   actionUrl?: string; // URL to navigate when clicked
 }
@@ -40,10 +41,15 @@ const loadNotificationsFromStorage = (): NotificationState => {
     const stored = localStorage.getItem('notifications');
     if (stored) {
       const parsed = JSON.parse(stored);
-      // Convert timestamp strings back to Date objects
+      // Keep timestamps as strings for Redux serialization
+      // Only ensure they're valid ISO strings
       const notifications = parsed.notifications.map((n: any) => ({
         ...n,
-        timestamp: new Date(n.timestamp),
+        timestamp: typeof n.timestamp === 'string' 
+          ? n.timestamp 
+          : n.timestamp instanceof Date 
+          ? n.timestamp.toISOString() 
+          : new Date(n.timestamp).toISOString(),
       }));
       return {
         notifications,
@@ -121,10 +127,15 @@ const saveNotificationsToStorage = (state: NotificationState) => {
   
   try {
     // Convert Date objects to ISO strings for storage
+    // Handle both Date objects and ISO strings (from DB)
     const toStore = {
       notifications: state.notifications.map((n) => ({
         ...n,
-        timestamp: n.timestamp.toISOString(),
+        timestamp: n.timestamp instanceof Date 
+          ? n.timestamp.toISOString() 
+          : typeof n.timestamp === 'string' 
+          ? n.timestamp 
+          : new Date(n.timestamp).toISOString(),
       })),
       unreadCount: state.unreadCount,
     };
@@ -139,17 +150,30 @@ const notificationSlice = createSlice({
   initialState,
   reducers: {
     addNotification(state, action: PayloadAction<Notification>) {
+      // Ensure timestamp is a string for Redux serialization
+      const notification = {
+        ...action.payload,
+        timestamp: typeof action.payload.timestamp === 'string' 
+          ? action.payload.timestamp 
+          : action.payload.timestamp instanceof Date 
+          ? action.payload.timestamp.toISOString() 
+          : new Date(action.payload.timestamp).toISOString(),
+      };
+
       // Check if notification already exists (avoid duplicates)
+      // Compare timestamps as strings or convert both to Date for comparison
       const exists = state.notifications.some(
         (n) =>
-          n.type === action.payload.type &&
-          n.roomType === action.payload.roomType &&
-          n.roomId === action.payload.roomId &&
-          n.timestamp.getTime() === action.payload.timestamp.getTime()
+          n.type === notification.type &&
+          n.roomType === notification.roomType &&
+          n.roomId === notification.roomId &&
+          (typeof n.timestamp === 'string' && typeof notification.timestamp === 'string'
+            ? n.timestamp === notification.timestamp
+            : new Date(n.timestamp).getTime() === new Date(notification.timestamp).getTime())
       );
 
       if (!exists) {
-        state.notifications.unshift(action.payload);
+        state.notifications.unshift(notification);
         state.unreadCount += 1;
         
         // Keep only last 50 notifications
@@ -230,19 +254,26 @@ const notificationSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchNotificationsThunk.fulfilled, (state, action) => {
-        // Merge DB notifications with existing ones (avoid duplicates)
+        // Replace local notifications with DB notifications to ensure consistency
+        // DB is the source of truth for persisted notifications
         const dbNotifications = action.payload;
-        const existingIds = new Set(state.notifications.map((n) => n.id));
         
-        // Add new DB notifications that don't exist locally
-        dbNotifications.forEach((dbNotif: Notification) => {
-          if (!existingIds.has(dbNotif.id)) {
-            state.notifications.unshift(dbNotif);
-            if (!dbNotif.read) {
-              state.unreadCount += 1;
-            }
-          }
-        });
+        // Ensure all timestamps are strings (not Date objects) for Redux serialization
+        const serializedNotifications = dbNotifications.map((n: any) => ({
+          ...n,
+          timestamp: typeof n.timestamp === 'string' 
+            ? n.timestamp 
+            : n.timestamp instanceof Date 
+            ? n.timestamp.toISOString() 
+            : new Date(n.timestamp).toISOString(),
+        }));
+        
+        // Calculate unread count from DB notifications
+        const unreadCount = serializedNotifications.filter((n: Notification) => !n.read).length;
+        
+        // Update state with DB notifications
+        state.notifications = serializedNotifications;
+        state.unreadCount = unreadCount;
 
         // Sort by timestamp (newest first)
         state.notifications.sort((a, b) => 
@@ -284,8 +315,14 @@ export default notificationSlice.reducer;
 export const selectNotifications = (state: { notifications: NotificationState }) =>
   state.notifications.notifications;
 
-export const selectUnreadCount = (state: { notifications: NotificationState }) =>
-  state.notifications.unreadCount;
+// Only count DB notifications (those with id starting with 'db-') for the badge
+// This ensures temporary toast notifications don't affect the badge count
+export const selectUnreadCount = (state: { notifications: NotificationState }) => {
+  const dbNotifications = state.notifications.notifications.filter(
+    (n) => n.id.startsWith('db-')
+  );
+  return dbNotifications.filter((n) => !n.read).length;
+};
 
 export const selectIsBellOpen = (state: { notifications: NotificationState }) =>
   state.notifications.isBellOpen;

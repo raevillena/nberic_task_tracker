@@ -69,34 +69,55 @@ export async function POST(
             attributes: ['id', 'projectId'],
           },
         ],
-      }).then((reloadedTask) => {
-        emitTaskAssigned(reloadedTask, userIds).catch((err) => {
-          console.error('Failed to emit task:assigned event:', err);
-        });
-        
-        // Create DB notifications for assigned researchers
+      }).then(async (reloadedTask) => {
         const taskData = reloadedTask as any;
         const creatorName = reloadedTask.createdBy
           ? `${reloadedTask.createdBy.firstName} ${reloadedTask.createdBy.lastName}`
           : 'A manager';
         
-        userIds.forEach((userId) => {
-          createNotification(userId, {
-            type: 'task',
-            title: 'New Task Assigned',
-            message: `${creatorName} assigned you to task "${reloadedTask.name}"`,
-            taskId: reloadedTask.id,
-            projectId: taskData?.study?.projectId,
-            studyId: reloadedTask.studyId,
-            senderId: reloadedTask.createdById,
-            senderName: creatorName,
-            actionUrl: taskData?.study?.projectId
-              ? `/dashboard/projects/${taskData.study.projectId}/studies/${reloadedTask.studyId}/tasks/${reloadedTask.id}`
-              : `/dashboard/tasks?highlight=${reloadedTask.id}`,
-            timestamp: new Date(),
-          }).catch((err) => {
-            console.error(`Failed to create notification for user ${userId}:`, err);
-          });
+        // Filter out users who already have a notification (e.g., if task was just created with assignedToId)
+        // This prevents duplicate notifications when a task is created with multiple researchers
+        // The first researcher already got a notification during task creation
+        const usersToNotify = userIds.filter((userId) => {
+          // If this task was just created (within last 5 seconds) and this user is the assignedToId,
+          // they already got a notification during creation, so skip them
+          const taskAge = Date.now() - new Date(reloadedTask.createdAt).getTime();
+          const isRecentlyCreated = taskAge < 5000; // 5 seconds
+          const isOriginalAssignee = reloadedTask.assignedToId === userId;
+          
+          // Skip notification if task was recently created and this user is the original assignee
+          return !(isRecentlyCreated && isOriginalAssignee);
+        });
+        
+        // Create DB notifications for assigned researchers FIRST (await to ensure they're created)
+        // Only notify users who didn't already get a notification during task creation
+        if (usersToNotify.length > 0) {
+          await Promise.all(
+            usersToNotify.map((userId) =>
+              createNotification(userId, {
+                type: 'task',
+                title: 'New Task Assigned',
+                message: `${creatorName} assigned you to task "${reloadedTask.name}"`,
+                taskId: reloadedTask.id,
+                projectId: taskData?.study?.projectId,
+                studyId: reloadedTask.studyId,
+                senderId: reloadedTask.createdById,
+                senderName: creatorName,
+                actionUrl: taskData?.study?.projectId
+                  ? `/dashboard/projects/${taskData.study.projectId}/studies/${reloadedTask.studyId}/tasks/${reloadedTask.id}`
+                  : `/dashboard/tasks?highlight=${reloadedTask.id}`,
+                timestamp: new Date(),
+              }).catch((err) => {
+                console.error(`Failed to create notification for user ${userId}:`, err);
+              })
+            )
+          );
+        }
+        
+        // Emit socket event AFTER notifications are created (so client can refresh and see them)
+        // Only emit for users who actually got new notifications to avoid duplicate toasts
+        emitTaskAssigned(reloadedTask, usersToNotify.length > 0 ? usersToNotify : userIds).catch((err) => {
+          console.error('Failed to emit task:assigned event:', err);
         });
       }).catch(() => {
         // If reload fails, emit anyway with basic task data

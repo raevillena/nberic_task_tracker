@@ -41,10 +41,12 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        // Ignore these action types and Date objects in socket events
+        // Ignore these action types
         ignoredActions: ['persist/PERSIST'],
         // Allow Date objects in payloads (from API responses and socket events)
         ignoredActionPaths: ['payload.createdAt', 'payload.updatedAt', 'payload.completedAt', 'payload.dueDate'],
+        // Ignore notification timestamps (they should be strings, but allow Date objects during migration)
+        ignoredPaths: ['notifications.notifications.0.timestamp'],
       },
     }),
 });

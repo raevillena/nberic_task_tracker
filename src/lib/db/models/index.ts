@@ -9,6 +9,9 @@ import { ComplianceFlag } from './complianceFlag';
 import { TaskRequest } from './taskRequest';
 import { TaskAssignment } from './taskAssignment';
 import { Notification } from './notification';
+import { TaskRead } from './taskRead';
+import { ProjectRead } from './projectRead';
+import { StudyRead } from './studyRead';
 
 // User Associations
 User.hasMany(Project, {
@@ -196,6 +199,31 @@ User.hasMany(Notification, {
   as: 'notifications',
 });
 
+// TaskRead associations
+TaskRead.belongsTo(Task, {
+  foreignKey: 'taskId',
+  as: 'task',
+});
+
+TaskRead.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user',
+});
+
+Task.belongsToMany(User, {
+  through: TaskRead,
+  foreignKey: 'taskId',
+  otherKey: 'userId',
+  as: 'readBy',
+});
+
+User.belongsToMany(Task, {
+  through: TaskRead,
+  foreignKey: 'userId',
+  otherKey: 'taskId',
+  as: 'readTasks',
+});
+
 // Message Associations
 Message.belongsTo(User, {
   foreignKey: 'senderId',
@@ -228,5 +256,5 @@ ComplianceFlag.belongsTo(User, {
   as: 'resolvedBy',
 });
 
-export { User, Project, Study, Task, Message, ComplianceFlag, TaskRequest, TaskAssignment, Notification };
+export { User, Project, Study, Task, Message, ComplianceFlag, TaskRequest, TaskAssignment, Notification, TaskRead, ProjectRead, StudyRead };
 

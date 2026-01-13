@@ -18,7 +18,7 @@ export const sequelize = new Sequelize(dbName, dbUser, dbPassword, {
   dialect: 'mariadb',
   logging: false, // Disable SQL query logging
   pool: {
-    max: 10,
+    max: 20, // Increased to handle concurrent requests
     min: 2,
     acquire: 30000,
     idle: 10000,

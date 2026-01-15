@@ -1,24 +1,37 @@
-// API route: GET /api/tasks, POST /api/tasks - Get all tasks or create standalone admin task
+// API route: GET /api/projects/[id]/tasks, POST /api/projects/[id]/tasks
+// Handles project-level tasks (admin tasks)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllTasks, getTasksReadStatus, createTask } from '@/services/taskService';
-import { getAuthenticatedUser, createErrorResponse, getErrorStatusCode } from '../middleware';
+import { getTasksByProject, createTask, getTasksReadStatus } from '@/services/taskService';
+import { getAuthenticatedUser, createErrorResponse, getErrorStatusCode } from '../../../middleware';
 import { CreateTaskRequest } from '@/types/api';
-import { TaskType } from '@/types/entities';
 import { createNotification } from '@/services/notificationService';
 import { emitTaskAssigned } from '@/lib/socket/taskRequestEvents';
-import { Task, User } from '@/lib/db/models';
+import { Task, User, Project } from '@/lib/db/models';
+import { TaskType } from '@/types/entities';
 
 /**
- * GET /api/tasks
- * Get all tasks
+ * GET /api/projects/[id]/tasks
+ * Get all tasks for a project (both research and admin tasks)
  * - Managers: See all tasks
  * - Researchers: See only assigned tasks
  */
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     const user = await getAuthenticatedUser(request);
-    const tasks = await getAllTasks(user);
+    const projectId = parseInt(params.id, 10);
+
+    if (isNaN(projectId)) {
+      return NextResponse.json(
+        { error: 'ValidationError', message: 'Invalid project ID' },
+        { status: 400 }
+      );
+    }
+
+    const tasks = await getTasksByProject(projectId, user);
 
     // Get read status for all tasks
     const taskIds = tasks.map((t) => t.id);
@@ -40,32 +53,50 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * POST /api/tasks
- * Create a standalone admin task (no project or study required)
+ * POST /api/projects/[id]/tasks
+ * Create a new admin task at the project level
  * - Only Managers can create tasks
  */
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     const user = await getAuthenticatedUser(request);
+    const projectId = parseInt(params.id, 10);
+
+    if (isNaN(projectId)) {
+      return NextResponse.json(
+        { error: 'ValidationError', message: 'Invalid project ID' },
+        { status: 400 }
+      );
+    }
+
     const body: CreateTaskRequest = await request.json();
     
-    // Ensure taskType is ADMIN for standalone tasks
+    // Ensure taskType is ADMIN for project-level tasks
+    // projectId is optional - admin tasks can be standalone or tied to a project
     const taskData: CreateTaskRequest = {
       ...body,
       taskType: TaskType.ADMIN,
-      // projectId is optional for admin tasks
+      projectId, // Set projectId from URL param (optional for admin tasks)
     };
 
-    // Create admin task (studyId is null, projectId is optional)
+    // Create admin task (studyId is null for admin tasks, projectId is optional)
     const task = await createTask(null, taskData, user);
 
     // If task was created with an initial assignment, create notification and emit socket event
     if (task.assignedToId) {
-      // Reload task with createdBy and assignedTo for notification
+      // Reload task with createdBy and project for notification
       const reloadedTask = await task.reload({
         include: [
           { model: User, as: 'createdBy' },
           { model: User, as: 'assignedTo' },
+          {
+            model: Project,
+            as: 'project',
+            attributes: ['id', 'name'],
+          },
         ],
       });
 
@@ -73,14 +104,14 @@ export async function POST(request: NextRequest) {
         ? `${reloadedTask.createdBy.firstName} ${reloadedTask.createdBy.lastName}`
         : 'A manager';
 
-      // Create DB notification for assigned researcher
+      // Create DB notification for assigned researcher FIRST (await to ensure it's created)
       await createNotification(reloadedTask.assignedToId, {
         type: 'task',
         title: 'New Task Assigned',
         message: `${creatorName} assigned you to task "${reloadedTask.name}"`,
         taskId: reloadedTask.id,
-        projectId: reloadedTask.projectId || null,
-        studyId: null,
+        projectId: reloadedTask.projectId || projectId,
+        studyId: null, // Admin tasks don't have studyId
         senderId: reloadedTask.createdById,
         senderName: creatorName,
         actionUrl: reloadedTask.projectId
@@ -91,7 +122,7 @@ export async function POST(request: NextRequest) {
         console.error(`Failed to create notification for user ${reloadedTask.assignedToId}:`, err);
       });
 
-      // Emit socket event AFTER notification is created
+      // Emit socket event AFTER notification is created (so client can refresh and see it)
       emitTaskAssigned(reloadedTask, [reloadedTask.assignedToId]).catch((err) => {
         console.error('Failed to emit task:assigned event:', err);
       });

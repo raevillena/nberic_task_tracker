@@ -2,12 +2,14 @@
 
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../connection';
-import { TaskStatus, TaskPriority } from '@/types/entities';
+import { TaskStatus, TaskPriority, TaskType } from '@/types/entities';
 import { Op } from 'sequelize';
 
 interface TaskAttributes {
   id: number;
-  studyId: number;
+  taskType: TaskType;
+  studyId: number | null; // Nullable for admin tasks
+  projectId: number | null; // Optional project reference for admin tasks
   name: string;
   description: string | null;
   status: TaskStatus;
@@ -22,11 +24,13 @@ interface TaskAttributes {
   updatedAt: Date;
 }
 
-interface TaskCreationAttributes extends Optional<TaskAttributes, 'id' | 'description' | 'status' | 'priority' | 'assignedToId' | 'completedAt' | 'completedById' | 'dueDate' | 'createdAt' | 'updatedAt'> {}
+interface TaskCreationAttributes extends Optional<TaskAttributes, 'id' | 'taskType' | 'description' | 'status' | 'priority' | 'assignedToId' | 'completedAt' | 'completedById' | 'dueDate' | 'studyId' | 'projectId' | 'createdAt' | 'updatedAt'> {}
 
 export class Task extends Model<TaskAttributes, TaskCreationAttributes> implements TaskAttributes {
   declare id: number;
-  declare studyId: number;
+  declare taskType: TaskType;
+  declare studyId: number | null;
+  declare projectId: number | null;
   declare name: string;
   declare description: string | null;
   declare status: TaskStatus;
@@ -48,11 +52,26 @@ Task.init(
       autoIncrement: true,
       primaryKey: true,
     },
+    taskType: {
+      type: DataTypes.ENUM('research', 'admin'),
+      allowNull: false,
+      defaultValue: TaskType.RESEARCH,
+    },
     studyId: {
       type: DataTypes.INTEGER.UNSIGNED,
-      allowNull: false,
+      allowNull: true, // Nullable for admin tasks
       references: {
         model: 'studies',
+        key: 'id',
+      },
+      onUpdate: 'CASCADE',
+      onDelete: 'CASCADE',
+    },
+    projectId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: 'projects',
         key: 'id',
       },
       onUpdate: 'CASCADE',
@@ -141,6 +160,14 @@ Task.init(
         name: 'idx_tasks_study',
       },
       {
+        fields: ['project_id'],
+        name: 'idx_tasks_project',
+      },
+      {
+        fields: ['task_type'],
+        name: 'idx_tasks_task_type',
+      },
+      {
         fields: ['assigned_to_id'],
         name: 'idx_tasks_assigned_to',
       },
@@ -163,6 +190,14 @@ Task.init(
       {
         fields: ['study_id', 'status'],
         name: 'idx_tasks_study_status',
+      },
+      {
+        fields: ['project_id', 'task_type'],
+        name: 'idx_tasks_project_type',
+      },
+      {
+        fields: ['study_id', 'task_type'],
+        name: 'idx_tasks_study_type',
       },
       {
         fields: ['deleted_at'],
@@ -188,4 +223,23 @@ Task.init(
     },
   }
 );
+
+// Add model-level validation for task type rules
+// RESEARCH tasks must have studyId, ADMIN tasks don't require it
+Task.addHook('beforeValidate', (task: Task) => {
+  // Default to RESEARCH if not specified (for backward compatibility)
+  if (!task.taskType) {
+    task.taskType = TaskType.RESEARCH;
+  }
+
+  // Validate task type rules
+  if (task.taskType === TaskType.RESEARCH) {
+    if (!task.studyId) {
+      throw new Error('Research tasks must have a studyId');
+    }
+  } else if (task.taskType === TaskType.ADMIN) {
+    // Admin tasks don't require studyId, but can optionally have projectId
+    // No validation needed here - both can be null
+  }
+});
 

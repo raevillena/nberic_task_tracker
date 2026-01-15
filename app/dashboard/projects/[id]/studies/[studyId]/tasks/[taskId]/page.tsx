@@ -3,24 +3,60 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchTaskByIdThunk, updateTaskThunk, deleteTaskThunk } from '@/store/slices/taskSlice';
 import { TaskStatus, TaskPriority, UserRole } from '@/types/entities';
 import Link from 'next/link';
 import { TaskChat } from '@/components/tasks/TaskChat';
+import { useNavigationHistory } from '@/hooks/useNavigationHistory';
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 
 export default function TaskDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const pathname = usePathname();
   const dispatch = useAppDispatch();
+  const { getReferrer } = useNavigationHistory();
   const projectId = parseInt(params.id as string, 10);
   const studyId = parseInt(params.studyId as string, 10);
   const taskId = parseInt(params.taskId as string, 10);
+  
+  // Get back URL - check if came from tasks list or study page
+  const backUrl = getReferrer(
+    pathname,
+    `/dashboard/projects/${projectId}/studies/${studyId}`
+  );
 
   const task = useAppSelector((state) =>
     taskId && !isNaN(taskId) ? state.task.entities[taskId] : undefined
   );
+
+  // Build breadcrumbs based on where user came from
+  const breadcrumbItems = (() => {
+    if (typeof window === 'undefined') return [];
+    
+    const referrer = sessionStorage.getItem(`referrer:${pathname}`);
+    const items = [];
+    
+    if (referrer === '/dashboard/tasks') {
+      // Came from all tasks page
+      items.push(
+        { label: 'All Tasks', href: '/dashboard/tasks' },
+        { label: task?.name || 'Task', href: '#' }
+      );
+    } else {
+      // Came from study page or project page - show full hierarchy
+      items.push(
+        { label: 'Projects', href: '/dashboard/projects' },
+        { label: task?.study?.project?.name || 'Project', href: `/dashboard/projects/${projectId}` },
+        { label: task?.study?.name || 'Study', href: `/dashboard/projects/${projectId}/studies/${studyId}` },
+        { label: task?.name || 'Task', href: '#' }
+      );
+    }
+    
+    return items;
+  })();
   const isLoading = useAppSelector((state) => state.task.isLoading);
   const isUpdating = useAppSelector((state) => state.task.isUpdating);
   const isDeleting = useAppSelector((state) => state.task.isDeleting);
@@ -358,8 +394,8 @@ export default function TaskDetailPage() {
     return (
       <div className="text-center py-8">
         <p className="text-red-600 mb-4">{error}</p>
-        <Link href={`/dashboard/projects/${projectId}/studies/${studyId}`} className="text-indigo-600 hover:text-indigo-700">
-          Back to Study
+        <Link href={backUrl} className="text-indigo-600 hover:text-indigo-700">
+          Back
         </Link>
       </div>
     );
@@ -369,8 +405,8 @@ export default function TaskDetailPage() {
     return (
       <div className="text-center py-8">
         <p className="text-gray-500 mb-4">Task not found</p>
-        <Link href={`/dashboard/projects/${projectId}/studies/${studyId}`} className="text-indigo-600 hover:text-indigo-700">
-          Back to Study
+        <Link href={backUrl} className="text-indigo-600 hover:text-indigo-700">
+          Back
         </Link>
       </div>
     );
@@ -422,11 +458,12 @@ export default function TaskDetailPage() {
   return (
     <div>
       <div className="mb-6">
+        <Breadcrumbs items={breadcrumbItems} />
         <Link
-          href={`/dashboard/projects/${projectId}/studies/${studyId}`}
+          href={backUrl}
           className="text-indigo-600 hover:text-indigo-700 mb-4 inline-block"
         >
-          ← Back to Study
+          ← Back
         </Link>
         <div className="flex justify-between items-start">
           <div className="flex-1">

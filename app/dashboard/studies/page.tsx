@@ -43,8 +43,11 @@ export default function StudiesPage() {
           console.error('Failed to mark study as read:', error);
         });
     }
+    // Store referrer for back navigation
+    const studyPath = `/dashboard/projects/${projectId}/studies/${studyId}`;
+    sessionStorage.setItem(`referrer:${studyPath}`, '/dashboard/studies');
     // Navigate to study detail
-    router.push(`/dashboard/projects/${projectId}/studies/${studyId}`);
+    router.push(studyPath);
   };
 
   useEffect(() => {

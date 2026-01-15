@@ -76,8 +76,28 @@ export interface ClientToServerEvents {
   }) => void;
 }
 
+// Notification payload for socket events
+export interface SocketNotification {
+  id: string;
+  type: 'message' | 'task' | 'system';
+  title: string;
+  message: string;
+  roomType?: MessageRoomType;
+  roomId?: number;
+  taskId?: number;
+  projectId?: number;
+  studyId?: number;
+  senderId?: number;
+  senderName?: string;
+  actionUrl?: string;
+  timestamp: string;
+}
+
 // Server → Client Events
 export interface ServerToClientEvents {
+  // Notification events - for real-time toast notifications
+  'notification:new': (data: { notification: SocketNotification; targetUserId: number }) => void;
+  
   // Task events
   'task:updated': (data: { task: Task }) => void;
   'task:completed': (data: { task: Task }) => void;

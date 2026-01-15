@@ -51,6 +51,8 @@ export interface StudyResponse extends Study {}
 
 // Task API Types
 export interface CreateTaskRequest {
+  taskType?: 'research' | 'admin'; // Optional, defaults to 'research' for backward compatibility
+  projectId?: number; // Required for admin tasks, optional for research tasks
   name: string;
   description?: string;
   priority?: TaskPriority;

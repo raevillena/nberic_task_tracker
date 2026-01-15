@@ -141,53 +141,10 @@ export function initializeSocketClient(
         })
       );
     }
-
-    // Create notification if message is not from current user
-    const currentUserId = state?.auth?.user?.id;
-
-    if (currentUserId && data.message.senderId !== currentUserId) {
-      // Build action URL based on room type
-      // Note: For tasks, we need projectId and studyId which should be included in message context
-      // For now, we'll use a hash-based navigation that the frontend can handle
-      let actionUrl = '';
-      if (data.message.roomType === 'task') {
-        // Task URL requires projectId and studyId - these should come from task context
-        // For now, use a hash that can be resolved on the frontend
-        actionUrl = `#task-${data.message.roomId}`;
-      } else if (data.message.roomType === 'study') {
-        actionUrl = `/dashboard/projects/${data.message.roomId}/studies/${data.message.roomId}`;
-      } else if (data.message.roomType === 'project') {
-        actionUrl = `/dashboard/projects/${data.message.roomId}`;
-      }
-
-      dispatch(
-        addNotification({
-          id: `msg-${data.message.id}-${Date.now()}`,
-          type: 'message',
-          title:
-            data.message.roomType === 'task'
-              ? 'New message in task'
-              : data.message.roomType === 'study'
-              ? 'New message in study'
-              : 'New message in project',
-          message:
-            data.message.type === 'text'
-              ? data.message.content.substring(0, 100)
-              : data.message.type === 'image'
-              ? '📷 Image'
-              : '📎 File',
-          roomType: data.message.roomType,
-          roomId: data.message.roomId,
-          senderId: data.message.senderId,
-          senderName: data.message.sender
-            ? `${data.message.sender.firstName} ${data.message.sender.lastName}`
-            : undefined,
-          timestamp: new Date(data.message.createdAt).toISOString(),
-          read: false,
-          actionUrl,
-        })
-      );
-    }
+    
+    // NOTE: Toast notifications are now handled by the 'notification:new' event
+    // which is sent to ALL users who should receive the notification, regardless
+    // of whether they're in the room. This avoids duplicate toasts.
   });
 
   socket.on('message:edited', (data) => {
@@ -256,14 +213,11 @@ export function initializeSocketClient(
     
     // Only notify if current user is in the assignedUserIds list
     if (currentUserId && data.assignedUserIds?.includes(currentUserId)) {
-      // Don't add temporary notification - the DB notification was already created by the API route
-      // Just refresh notifications from DB to show the real notification and update badge
-      // Use a small delay to ensure DB transaction has completed (notification is created before socket emit)
-      setTimeout(() => {
-        import('@/store/slices/notificationSlice').then(({ fetchNotificationsThunk }) => {
-          dispatch(fetchNotificationsThunk());
-        });
-      }, 100); // Reduced delay since notification is created before socket emit
+      // The DB notification was already created by the API route BEFORE the socket emit
+      // Refresh notifications immediately - no delay needed since server awaits notification creation
+      import('@/store/slices/notificationSlice').then(({ fetchNotificationsThunk }) => {
+        dispatch(fetchNotificationsThunk());
+      });
     }
     
     // Update task in Redux store
@@ -436,6 +390,42 @@ export function initializeSocketClient(
           actionUrl,
         })
       );
+    }
+  });
+
+  // Real-time notification handler - for notifications sent directly to user
+  // This handles notifications for users who are NOT in the chat room
+  socket.on('notification:new', (data) => {
+    console.log('Real-time notification received:', data);
+    const state = getState?.();
+    const currentUserId = state?.auth?.user?.id;
+
+    // Only process if this notification is for the current user
+    if (currentUserId && data.targetUserId === currentUserId) {
+      // Add the notification to Redux store (shows toast)
+      dispatch(
+        addNotification({
+          id: data.notification.id,
+          type: data.notification.type,
+          title: data.notification.title,
+          message: data.notification.message,
+          roomType: data.notification.roomType,
+          roomId: data.notification.roomId,
+          taskId: data.notification.taskId,
+          projectId: data.notification.projectId,
+          studyId: data.notification.studyId,
+          senderId: data.notification.senderId,
+          senderName: data.notification.senderName,
+          actionUrl: data.notification.actionUrl,
+          timestamp: data.notification.timestamp,
+          read: false,
+        })
+      );
+      
+      // Also refresh notifications from DB to update the badge count
+      import('@/store/slices/notificationSlice').then(({ fetchNotificationsThunk }) => {
+        dispatch(fetchNotificationsThunk());
+      });
     }
   });
 

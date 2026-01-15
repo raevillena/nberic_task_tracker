@@ -2,18 +2,24 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchAllTasksThunk, selectAllTasks, createTaskThunk } from '@/store/slices/taskSlice';
 import { fetchProjectsThunk, selectAllProjects } from '@/store/slices/projectSlice';
 import { fetchStudiesByProjectThunk, selectStudiesByProjectId } from '@/store/slices/studySlice';
 import { addNotification } from '@/store/slices/notificationSlice';
-import { TaskStatus, TaskPriority, User, Study } from '@/types/entities';
+import { TaskStatus, TaskPriority, TaskType, User, Study, Task } from '@/types/entities';
 import Link from 'next/link';
 
 // Stable empty array to prevent unnecessary rerenders
 const EMPTY_STUDIES: Study[] = [];
+
+// Sort direction type
+type SortDirection = 'asc' | 'desc' | null;
+
+// Sortable column keys
+type SortColumn = 'task' | 'project' | 'assignedTo' | 'assignedDate' | 'priority' | 'status' | 'dueDate';
 
 export default function TasksPage() {
   const router = useRouter();
@@ -27,6 +33,7 @@ export default function TasksPage() {
   const { user } = useAppSelector((state) => state.auth);
   
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [taskType, setTaskType] = useState<TaskType>(TaskType.RESEARCH);
   const [selectedProjectId, setSelectedProjectId] = useState<number | ''>('');
   const [selectedStudyId, setSelectedStudyId] = useState<number | ''>('');
   const [taskName, setTaskName] = useState('');
@@ -38,6 +45,10 @@ export default function TasksPage() {
   const [researchers, setResearchers] = useState<User[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [loadingResearchers, setLoadingResearchers] = useState(false);
+  
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
 
   useEffect(() => {
     dispatch(fetchAllTasksThunk());
@@ -80,6 +91,155 @@ export default function TasksPage() {
       : EMPTY_STUDIES
   );
 
+  // Priority order for sorting (higher priority = higher value)
+  const priorityOrder: Record<TaskPriority, number> = {
+    [TaskPriority.URGENT]: 4,
+    [TaskPriority.HIGH]: 3,
+    [TaskPriority.MEDIUM]: 2,
+    [TaskPriority.LOW]: 1,
+  };
+
+  // Status order for sorting
+  const statusOrder: Record<TaskStatus, number> = {
+    [TaskStatus.COMPLETED]: 4,
+    [TaskStatus.IN_PROGRESS]: 3,
+    [TaskStatus.PENDING]: 2,
+    [TaskStatus.CANCELLED]: 1,
+  };
+
+  // Helper to get assigned date from task
+  // Checks TaskAssignment assignedAt first, then falls back to task createdAt for legacy assignments
+  const getAssignedDate = (task: any): Date | string | null => {
+    // Check if task has assignedResearchers with through data (many-to-many)
+    if (task.assignedResearchers && Array.isArray(task.assignedResearchers) && task.assignedResearchers.length > 0) {
+      // Get the earliest assignment date
+      // Sequelize through data is accessible as taskAssignment (camelCase) or TaskAssignment
+      const assignmentDates = task.assignedResearchers
+        .map((r: any) => {
+          // Try both camelCase and PascalCase property names
+          return (r as any).taskAssignment?.assignedAt || (r as any).TaskAssignment?.assignedAt;
+        })
+        .filter(Boolean)
+        .sort((a: Date, b: Date) => new Date(a).getTime() - new Date(b).getTime());
+      
+      if (assignmentDates.length > 0) {
+        return assignmentDates[0];
+      }
+    }
+    
+    // Fallback to task createdAt for legacy assignments (assignedToId)
+    if (task.assignedToId) {
+      return task.createdAt;
+    }
+    
+    return null;
+  };
+
+  // Handle column header click for sorting
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      // Cycle through: asc -> desc -> null
+      if (sortDirection === 'asc') {
+        setSortDirection('desc');
+      } else if (sortDirection === 'desc') {
+        setSortColumn(null);
+        setSortDirection(null);
+      }
+    } else {
+      // New column, start with ascending
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  // Sort tasks based on current sort column and direction
+  const sortedTasks = useMemo(() => {
+    if (!sortColumn || !sortDirection) {
+      return tasks;
+    }
+
+    const sorted = [...tasks].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortColumn) {
+        case 'task':
+          aValue = a.name?.toLowerCase() || '';
+          bValue = b.name?.toLowerCase() || '';
+          break;
+
+        case 'project':
+          // Sort by project name first, then study name
+          // Handle both research tasks (via study.project) and admin tasks (via project)
+          const aProject = a.study?.project?.name?.toLowerCase() || a.project?.name?.toLowerCase() || '';
+          const bProject = b.study?.project?.name?.toLowerCase() || b.project?.name?.toLowerCase() || '';
+          const aStudy = a.study?.name?.toLowerCase() || (a.taskType === TaskType.ADMIN ? 'Admin Task' : '');
+          const bStudy = b.study?.name?.toLowerCase() || (b.taskType === TaskType.ADMIN ? 'Admin Task' : '');
+          if (aProject !== bProject) {
+            aValue = aProject;
+            bValue = bProject;
+          } else {
+            aValue = aStudy;
+            bValue = bStudy;
+          }
+          break;
+
+        case 'assignedTo':
+          // Get first assigned user name, or 'Unassigned'
+          const aAssigned = a.assignedTo
+            ? `${a.assignedTo.firstName} ${a.assignedTo.lastName}`.toLowerCase()
+            : a.assignedResearchers && a.assignedResearchers.length > 0
+            ? `${a.assignedResearchers[0].firstName} ${a.assignedResearchers[0].lastName}`.toLowerCase()
+            : 'zzz_unassigned'; // Sort unassigned to end
+          const bAssigned = b.assignedTo
+            ? `${b.assignedTo.firstName} ${b.assignedTo.lastName}`.toLowerCase()
+            : b.assignedResearchers && b.assignedResearchers.length > 0
+            ? `${b.assignedResearchers[0].firstName} ${b.assignedResearchers[0].lastName}`.toLowerCase()
+            : 'zzz_unassigned';
+          aValue = aAssigned;
+          bValue = bAssigned;
+          break;
+
+        case 'assignedDate':
+          aValue = getAssignedDate(a);
+          bValue = getAssignedDate(b);
+          // Convert to timestamps for comparison
+          aValue = aValue ? new Date(aValue).getTime() : 0;
+          bValue = bValue ? new Date(bValue).getTime() : 0;
+          break;
+
+        case 'priority':
+          aValue = priorityOrder[a.priority] || 0;
+          bValue = priorityOrder[b.priority] || 0;
+          break;
+
+        case 'status':
+          aValue = statusOrder[a.status] || 0;
+          bValue = statusOrder[b.status] || 0;
+          break;
+
+        case 'dueDate':
+          aValue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+          bValue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+          break;
+
+        default:
+          return 0;
+      }
+
+      // Compare values
+      if (aValue < bValue) {
+        return sortDirection === 'asc' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortDirection === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+
+    return sorted;
+  }, [tasks, sortColumn, sortDirection]);
+
   // Helper functions for status and priority styling
   const getStatusColor = (status: TaskStatus) => {
     switch (status) {
@@ -120,19 +280,66 @@ export default function TasksPage() {
     });
   };
 
+  // Component for sortable table header
+  const SortableHeader = ({ column, children }: { column: SortColumn; children: string }) => {
+    const isActive = sortColumn === column;
+    const isAsc = isActive && sortDirection === 'asc';
+    const isDesc = isActive && sortDirection === 'desc';
+
+    return (
+      <th
+        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+        onClick={() => handleSort(column)}
+      >
+        <div className="flex items-center gap-2">
+          <span>{children}</span>
+          <span className="flex flex-col">
+            {/* Up arrow for ascending */}
+            <svg
+              className={`w-3 h-3 ${isAsc ? 'text-indigo-600' : 'text-gray-300'}`}
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                fillRule="evenodd"
+                d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"
+                clipRule="evenodd"
+              />
+            </svg>
+            {/* Down arrow for descending */}
+            <svg
+              className={`w-3 h-3 -mt-1 ${isDesc ? 'text-indigo-600' : 'text-gray-300'}`}
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path
+                fillRule="evenodd"
+                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </span>
+        </div>
+      </th>
+    );
+  };
+
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
-    if (!selectedProjectId || selectedProjectId === '') {
-      setFormError('Please select a project');
-      return;
+    // Research tasks require a project and study
+    if (taskType === TaskType.RESEARCH) {
+      if (!selectedProjectId || selectedProjectId === '') {
+        setFormError('Please select a project (required for research tasks)');
+        return;
+      }
+      if (!selectedStudyId || selectedStudyId === '') {
+        setFormError('Please select a study (required for research tasks)');
+        return;
+      }
     }
-
-    if (!selectedStudyId || selectedStudyId === '') {
-      setFormError('Please select a study');
-      return;
-    }
+    // Admin tasks don't require project or study - they can be standalone
 
     if (!taskName.trim()) {
       setFormError('Task name is required');
@@ -142,8 +349,10 @@ export default function TasksPage() {
     // Create task first, then assign if researchers selected
     const result = await dispatch(
       createTaskThunk({
-        studyId: selectedStudyId as number,
+        studyId: taskType === TaskType.RESEARCH ? (selectedStudyId as number) : null,
+        projectId: taskType === TaskType.ADMIN && selectedProjectId ? (selectedProjectId as number) : undefined,
         taskData: {
+          taskType,
           name: taskName.trim(),
           description: taskDescription.trim() || undefined,
           priority: taskPriority,
@@ -158,9 +367,20 @@ export default function TasksPage() {
       const projectId = availableStudies.find((s) => s.id === selectedStudyId)?.projectId;
       
       // Assign to researchers if selected
-      if (assignedUserIds.length > 0 && task && task.id && projectId) {
+      if (assignedUserIds.length > 0 && task && task.id) {
         try {
-          await fetch(`/api/projects/${projectId}/studies/${selectedStudyId}/tasks/${task.id}/assign`, {
+          let assignUrl: string;
+          if (task.taskType === TaskType.RESEARCH && projectId && selectedStudyId) {
+            // Research task - use study-level assignment endpoint
+            assignUrl = `/api/projects/${projectId}/studies/${selectedStudyId}/tasks/${task.id}/assign`;
+          } else if (task.taskType === TaskType.ADMIN && task.projectId) {
+            // Admin task with project - use project-level assignment endpoint
+            assignUrl = `/api/projects/${task.projectId}/tasks/${task.id}/assign`;
+          } else {
+            // Standalone admin task or fallback - try general task assignment
+            assignUrl = `/api/tasks/${task.id}/assign`;
+          }
+          await fetch(assignUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -187,8 +407,19 @@ export default function TasksPage() {
       setFormError(null);
       
       // Navigate to the task detail page if available
-      if (task && task.id && projectId) {
-        router.push(`/dashboard/projects/${projectId}/studies/${task.studyId}/tasks/${task.id}`);
+      if (task && task.id) {
+        if (task.taskType === TaskType.ADMIN) {
+          if (task.projectId) {
+            // Admin task with project - navigate to project-level task page
+            router.push(`/dashboard/projects/${task.projectId}/tasks/${task.id}`);
+          } else {
+            // Standalone admin task - navigate to general tasks page
+            router.push(`/dashboard/tasks?highlight=${task.id}`);
+          }
+        } else if (task.studyId && projectId) {
+          // Research task - navigate to study-level task page
+          router.push(`/dashboard/projects/${projectId}/studies/${task.studyId}/tasks/${task.id}`);
+        }
       }
     } else {
       setFormError(result.payload as string || 'Failed to create task');
@@ -249,28 +480,17 @@ export default function TasksPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Task
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Project / Study
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Assigned To
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Priority
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Due Date
-                  </th>
+                  <SortableHeader column="task">Task</SortableHeader>
+                  <SortableHeader column="project">Project / Study</SortableHeader>
+                  <SortableHeader column="assignedTo">Assigned To</SortableHeader>
+                  <SortableHeader column="assignedDate">Assigned Date</SortableHeader>
+                  <SortableHeader column="priority">Priority</SortableHeader>
+                  <SortableHeader column="status">Status</SortableHeader>
+                  <SortableHeader column="dueDate">Due Date</SortableHeader>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {tasks.map((task) => (
+                {sortedTasks.map((task) => (
                   <tr
                     key={task.id}
                     className="hover:bg-gray-50 transition-colors"
@@ -281,13 +501,42 @@ export default function TasksPage() {
                           <div className="h-2 w-2 bg-indigo-600 rounded-full flex-shrink-0" title="Unread" />
                         )}
                         <Link
-                          href={`/dashboard/projects/${task.study?.project?.id || ''}/studies/${task.studyId}/tasks/${task.id}`}
+                          href={
+                            task.taskType === TaskType.ADMIN && task.projectId
+                              ? `/dashboard/projects/${task.projectId}/tasks/${task.id}`
+                              : task.taskType === TaskType.ADMIN
+                              ? `/dashboard/tasks/${task.id}`
+                              : task.studyId && task.study?.project?.id
+                              ? `/dashboard/projects/${task.study.project.id}/studies/${task.studyId}/tasks/${task.id}`
+                              : `/dashboard/tasks/${task.id}`
+                          }
+                          onClick={() => {
+                            // Store referrer for back navigation
+                            const taskPath =
+                              task.taskType === TaskType.ADMIN && task.projectId
+                                ? `/dashboard/projects/${task.projectId}/tasks/${task.id}`
+                                : task.taskType === TaskType.ADMIN
+                                ? `/dashboard/tasks/${task.id}`
+                                : task.studyId && task.study?.project?.id
+                                ? `/dashboard/projects/${task.study.project.id}/studies/${task.studyId}/tasks/${task.id}`
+                                : `/dashboard/tasks/${task.id}`;
+                            sessionStorage.setItem(`referrer:${taskPath}`, '/dashboard/tasks');
+                          }}
                           className={`text-sm font-medium hover:text-indigo-900 ${
                             !(task as any).isRead ? 'text-indigo-700 font-semibold' : 'text-indigo-600'
                           }`}
                         >
                           {task.name}
                         </Link>
+                        <span
+                          className={`px-2 py-0.5 text-xs font-medium rounded ${
+                            task.taskType === TaskType.ADMIN
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}
+                        >
+                          {task.taskType === TaskType.ADMIN ? 'Admin' : 'Research'}
+                        </span>
                       </div>
                       {task.description && (
                         <p className="text-sm text-gray-500 mt-1 line-clamp-1">{task.description}</p>
@@ -295,10 +544,12 @@ export default function TasksPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {task.study?.project?.name || 'Unknown Project'}
+                        {task.study?.project?.name || task.project?.name || 'Unknown Project'}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {task.study?.name || 'Unknown Study'}
+                        {task.taskType === TaskType.ADMIN
+                          ? 'Admin Task'
+                          : task.study?.name || 'Unknown Study'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -306,9 +557,21 @@ export default function TasksPage() {
                         <div className="text-sm text-gray-900">
                           {task.assignedTo.firstName} {task.assignedTo.lastName}
                         </div>
+                      ) : task.assignedResearchers && task.assignedResearchers.length > 0 ? (
+                        <div className="text-sm text-gray-900">
+                          {task.assignedResearchers.map((r: any, idx: number) => (
+                            <div key={r.id}>
+                              {r.firstName} {r.lastName}
+                              {idx < task.assignedResearchers.length - 1 && ', '}
+                            </div>
+                          ))}
+                        </div>
                       ) : (
                         <span className="text-sm text-gray-400">Unassigned</span>
                       )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatDate(getAssignedDate(task))}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
@@ -349,12 +612,14 @@ export default function TasksPage() {
                 <button
                   onClick={() => {
                     setShowCreateModal(false);
+                    setTaskType(TaskType.RESEARCH);
                     setSelectedProjectId('');
                     setSelectedStudyId('');
                     setTaskName('');
                     setTaskDescription('');
                     setTaskPriority(TaskPriority.MEDIUM);
                     setAssignedToId('');
+                    setAssignedUserIds([]);
                     setDueDate('');
                     setFormError(null);
                   }}
@@ -368,20 +633,49 @@ export default function TasksPage() {
 
               <form onSubmit={handleCreateTask} className="space-y-6">
                 <div>
+                  <label htmlFor="taskType" className="block text-sm font-medium text-gray-700 mb-2">
+                    Task Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="taskType"
+                    value={taskType}
+                    onChange={(e) => {
+                      const newType = e.target.value as TaskType;
+                      setTaskType(newType);
+                      // Reset study selection when switching to admin tasks
+                      if (newType === TaskType.ADMIN) {
+                        setSelectedStudyId('');
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                    disabled={isCreating}
+                  >
+                    <option value={TaskType.RESEARCH}>Research Task (requires Study)</option>
+                    <option value={TaskType.ADMIN}>Admin Task (standalone or project-level)</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {taskType === TaskType.RESEARCH
+                      ? 'Research tasks are tied to a study and contribute to progress tracking.'
+                      : 'Admin tasks are independent and do not require a project or study. They do not affect progress tracking.'}
+                  </p>
+                </div>
+
+                <div>
                   <label htmlFor="project" className="block text-sm font-medium text-gray-700 mb-2">
-                    Project <span className="text-red-500">*</span>
+                    Project {taskType === TaskType.RESEARCH && <span className="text-red-500">*</span>}
+                    {taskType === TaskType.ADMIN && <span className="text-gray-500 text-xs">(optional)</span>}
                   </label>
                   <div className="relative">
                     <select
                       id="project"
                       value={selectedProjectId}
                       onChange={(e) => setSelectedProjectId(e.target.value ? parseInt(e.target.value, 10) : '')}
-                      required
+                      required={taskType === TaskType.RESEARCH}
                       className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                       disabled={isCreating || isLoadingProjects}
                     >
                       <option value="">
-                        {isLoadingProjects ? 'Loading projects...' : 'Select a project'}
+                        {isLoadingProjects ? 'Loading projects...' : taskType === TaskType.ADMIN ? 'No project (standalone)' : 'Select a project'}
                       </option>
                       {projects.map((project) => (
                         <option key={project.id} value={project.id}>
@@ -397,39 +691,41 @@ export default function TasksPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label htmlFor="study" className="block text-sm font-medium text-gray-700 mb-2">
-                    Study <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <select
-                      id="study"
-                      value={selectedStudyId}
-                      onChange={(e) => setSelectedStudyId(e.target.value ? parseInt(e.target.value, 10) : '')}
-                      required
-                      disabled={!selectedProjectId || isCreating || isLoadingStudies}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    >
-                      <option value="">
-                        {!selectedProjectId 
-                          ? 'Select a project first' 
-                          : isLoadingStudies 
-                          ? 'Loading studies...' 
-                          : 'Select a study'}
-                      </option>
-                      {availableStudies.map((study) => (
-                        <option key={study.id} value={study.id}>
-                          {study.name}
+                {taskType === TaskType.RESEARCH && (
+                  <div>
+                    <label htmlFor="study" className="block text-sm font-medium text-gray-700 mb-2">
+                      Study <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <select
+                        id="study"
+                        value={selectedStudyId}
+                        onChange={(e) => setSelectedStudyId(e.target.value ? parseInt(e.target.value, 10) : '')}
+                        required={taskType === TaskType.RESEARCH}
+                        disabled={!selectedProjectId || isCreating || isLoadingStudies}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      >
+                        <option value="">
+                          {!selectedProjectId 
+                            ? 'Select a project first' 
+                            : isLoadingStudies 
+                            ? 'Loading studies...' 
+                            : 'Select a study'}
                         </option>
-                      ))}
-                    </select>
-                    {isLoadingStudies && selectedProjectId && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
-                      </div>
-                    )}
+                        {availableStudies.map((study) => (
+                          <option key={study.id} value={study.id}>
+                            {study.name}
+                          </option>
+                        ))}
+                      </select>
+                      {isLoadingStudies && selectedProjectId && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div>
                   <label htmlFor="taskName" className="block text-sm font-medium text-gray-700 mb-2">
@@ -572,7 +868,13 @@ export default function TasksPage() {
                   </button>
                   <button
                     type="submit"
-                    disabled={isCreating || !selectedProjectId || !selectedStudyId || !taskName.trim() || isLoadingProjects || isLoadingStudies}
+                    disabled={
+                      isCreating || 
+                      !taskName.trim() || 
+                      isLoadingProjects || 
+                      isLoadingStudies ||
+                      (taskType === TaskType.RESEARCH && (!selectedProjectId || !selectedStudyId))
+                    }
                     className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                   >
                     {isCreating ? (

@@ -1,36 +1,50 @@
-// Task complete API route
+// API route: POST /api/tasks/[taskId]/complete
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandler } from '@/lib/api/routeWrapper';
 import { completeTask } from '@/services/taskService';
+import { getAuthenticatedUser, createErrorResponse, getErrorStatusCode } from '../../../middleware';
+import { sequelize } from '@/lib/db/connection';
 
-// POST /api/tasks/[taskId]/complete - Mark task as complete
-export const POST = createRouteHandler(
-  async (req, context) => {
-    if (!req.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+/**
+ * POST /api/tasks/[taskId]/complete
+ * Complete a task (works for both research and admin tasks)
+ * - Managers can complete any task
+ * - Researchers can complete tasks assigned to them
+ * - Uses transaction to ensure progress calculation is atomic
+ */
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { taskId: string } }
+) {
+  // Use transaction to ensure task completion and progress update are atomic
+  const transaction = await sequelize.transaction();
 
-    const taskId = parseInt(context?.params?.taskId || '0', 10);
-    if (!taskId) {
+  try {
+    const user = await getAuthenticatedUser(request);
+    const taskId = parseInt(params.taskId, 10);
+
+    if (isNaN(taskId)) {
+      await transaction.rollback();
       return NextResponse.json(
-        { error: 'Bad Request', message: 'Invalid task ID' },
+        { error: 'ValidationError', message: 'Invalid task ID' },
         { status: 400 }
       );
     }
 
-    const task = await completeTask(taskId, req.user);
-    return NextResponse.json(task);
-  },
-  {
-    requireAuth: true,
-    requirePermission: {
-      resource: 'task',
-      action: 'complete',
-    },
-  }
-);
+    // Complete task and recalculate progress within transaction
+    // Progress is only calculated for research tasks with studies
+    const task = await completeTask(taskId, user, transaction);
 
+    // Commit transaction
+    await transaction.commit();
+
+    return NextResponse.json({ data: task });
+  } catch (error) {
+    // Rollback transaction on error
+    await transaction.rollback();
+    return createErrorResponse(
+      error as Error,
+      getErrorStatusCode(error as Error)
+    );
+  }
+}

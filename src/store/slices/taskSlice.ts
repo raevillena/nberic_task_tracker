@@ -109,15 +109,46 @@ export const fetchTaskByIdThunk = createAsyncThunk(
   }
 );
 
+/**
+ * Fetch task by ID without requiring project/study
+ * Used for admin tasks that may not have a study or project
+ */
+export const fetchTaskByIdDirectThunk = createAsyncThunk(
+  'task/fetchTaskByIdDirect',
+  async (
+    { taskId }: { taskId: number },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return rejectWithValue(error.message || 'Failed to fetch task');
+      }
+
+      const data = await response.json();
+      return data.data || data;
+    } catch (error) {
+      return rejectWithValue('Network error');
+    }
+  }
+);
+
 export const createTaskThunk = createAsyncThunk(
   'task/createTask',
   async (
     {
       studyId,
+      projectId,
       taskData,
     }: {
-      studyId: number;
+      studyId?: number | null;
+      projectId?: number;
       taskData: {
+        taskType?: 'research' | 'admin';
         name: string;
         description?: string;
         priority?: string;
@@ -128,7 +159,42 @@ export const createTaskThunk = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await fetch(`/api/studies/${studyId}/tasks`, {
+      // Determine which endpoint to use based on task type
+      const taskType = taskData.taskType || 'research';
+      let url: string;
+      
+      if (taskType === 'admin') {
+        if (projectId) {
+          // Admin task with project - use project-level endpoint
+          url = `/api/projects/${projectId}/tasks`;
+        } else {
+          // Standalone admin task - use general tasks endpoint
+          url = `/api/tasks`;
+        }
+      } else if (studyId) {
+        // Research task - use study-level endpoint
+        // Need to get projectId from study - fetch it first
+        try {
+          const studyResponse = await fetch(`/api/studies/${studyId}`, {
+            credentials: 'include',
+          });
+          if (!studyResponse.ok) {
+            return rejectWithValue('Failed to fetch study information');
+          }
+          const studyData = await studyResponse.json();
+          const studyProjectId = studyData.data?.projectId || studyData.projectId;
+          if (!studyProjectId) {
+            return rejectWithValue('Study does not have a project ID');
+          }
+          url = `/api/projects/${studyProjectId}/studies/${studyId}/tasks`;
+        } catch (error) {
+          return rejectWithValue('Failed to fetch study information');
+        }
+      } else {
+        return rejectWithValue('Research tasks require a studyId');
+      }
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -340,12 +406,14 @@ const taskSlice = createSlice({
         if (!state.ids.includes(task.id)) {
           state.ids.push(task.id);
         }
-        // Update byStudyId mapping
-        if (!state.byStudyId[task.studyId]) {
-          state.byStudyId[task.studyId] = [];
-        }
-        if (!state.byStudyId[task.studyId].includes(task.id)) {
-          state.byStudyId[task.studyId].push(task.id);
+        // Update byStudyId mapping (only for research tasks with studyId)
+        if (task.studyId) {
+          if (!state.byStudyId[task.studyId]) {
+            state.byStudyId[task.studyId] = [];
+          }
+          if (!state.byStudyId[task.studyId].includes(task.id)) {
+            state.byStudyId[task.studyId].push(task.id);
+          }
         }
       }
     },
@@ -419,17 +487,46 @@ const taskSlice = createSlice({
         if (!state.ids.includes(task.id)) {
           state.ids.push(task.id);
         }
-        // Update byStudyId mapping
-        if (!state.byStudyId[task.studyId]) {
-          state.byStudyId[task.studyId] = [];
-        }
-        if (!state.byStudyId[task.studyId].includes(task.id)) {
-          state.byStudyId[task.studyId].push(task.id);
+        // Update byStudyId mapping (only for research tasks with studyId)
+        if (task.studyId) {
+          if (!state.byStudyId[task.studyId]) {
+            state.byStudyId[task.studyId] = [];
+          }
+          if (!state.byStudyId[task.studyId].includes(task.id)) {
+            state.byStudyId[task.studyId].push(task.id);
+          }
         }
         state.currentTaskId = task.id;
         state.isLoading = false;
       })
       .addCase(fetchTaskByIdThunk.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload as string;
+      })
+      // Fetch task by ID directly (for admin tasks)
+      .addCase(fetchTaskByIdDirectThunk.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchTaskByIdDirectThunk.fulfilled, (state, action) => {
+        const task = action.payload as Task;
+        state.entities[task.id] = task;
+        if (!state.ids.includes(task.id)) {
+          state.ids.push(task.id);
+        }
+        // Update byStudyId mapping (only for research tasks with studyId)
+        if (task.studyId) {
+          if (!state.byStudyId[task.studyId]) {
+            state.byStudyId[task.studyId] = [];
+          }
+          if (!state.byStudyId[task.studyId].includes(task.id)) {
+            state.byStudyId[task.studyId].push(task.id);
+          }
+        }
+        state.currentTaskId = task.id;
+        state.isLoading = false;
+      })
+      .addCase(fetchTaskByIdDirectThunk.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       })
@@ -444,12 +541,14 @@ const taskSlice = createSlice({
         if (!state.ids.includes(task.id)) {
           state.ids.push(task.id);
         }
-        // Update byStudyId mapping
-        if (!state.byStudyId[task.studyId]) {
-          state.byStudyId[task.studyId] = [];
-        }
-        if (!state.byStudyId[task.studyId].includes(task.id)) {
-          state.byStudyId[task.studyId].push(task.id);
+        // Update byStudyId mapping (only for research tasks with studyId)
+        if (task.studyId) {
+          if (!state.byStudyId[task.studyId]) {
+            state.byStudyId[task.studyId] = [];
+          }
+          if (!state.byStudyId[task.studyId].includes(task.id)) {
+            state.byStudyId[task.studyId].push(task.id);
+          }
         }
         state.currentTaskId = task.id;
         state.isCreating = false;

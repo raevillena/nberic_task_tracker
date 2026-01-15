@@ -19,6 +19,11 @@ export enum TaskPriority {
   URGENT = 'urgent',
 }
 
+export enum TaskType {
+  RESEARCH = 'research',
+  ADMIN = 'admin',
+}
+
 export interface User {
   id: number;
   email: string;
@@ -61,7 +66,9 @@ export interface Study {
 
 export interface Task {
   id: number;
-  studyId: number;
+  taskType: TaskType;
+  studyId: number | null; // Nullable for admin tasks
+  projectId: number | null; // Optional project reference for admin tasks
   name: string;
   description: string | null;
   status: TaskStatus;
@@ -74,7 +81,8 @@ export interface Task {
   createdAt: Date;
   updatedAt: Date;
   // Relations (optional, loaded via include)
-  study?: Study;
+  study?: Study | null; // Nullable for admin tasks
+  project?: Project | null; // Optional project relation for admin tasks
   assignedTo?: User; // Legacy relation
   assignedResearchers?: User[]; // Many-to-many assignments
   createdBy?: User;

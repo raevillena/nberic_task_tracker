@@ -65,6 +65,11 @@ Project.hasMany(Study, {
   as: 'studies',
 });
 
+Project.hasMany(Task, {
+  foreignKey: 'projectId',
+  as: 'tasks',
+});
+
 // Study Associations
 Study.belongsTo(Project, {
   foreignKey: 'projectId',
@@ -85,6 +90,11 @@ Study.hasMany(Task, {
 Task.belongsTo(Study, {
   foreignKey: 'studyId',
   as: 'study',
+});
+
+Task.belongsTo(Project, {
+  foreignKey: 'projectId',
+  as: 'project',
 });
 
 Task.belongsTo(User, {

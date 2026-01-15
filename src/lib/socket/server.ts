@@ -52,6 +52,8 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
     const userId = socket.data.userId;
     const userRole = socket.data.userRole;
 
+    console.log(`[Socket.IO] User ${userId} (${userRole}) connected - socket id: ${socket.id}`);
+
     // Emit authentication success
     socket.emit('auth:success', {
       userId,
@@ -64,7 +66,8 @@ export function initializeSocketIO(httpServer: HTTPServer): SocketIOServer {
     setupTypingHandlers(socket, io);
 
     // Disconnection handler
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
+      console.log(`[Socket.IO] User ${userId} disconnected - reason: ${reason}`);
       // Clean up typing indicators
       cleanupTypingIndicators(userId);
     });

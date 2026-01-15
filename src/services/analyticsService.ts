@@ -240,6 +240,7 @@ export class AnalyticsService {
           INNER JOIN projects p ON p.id = s.project_id AND p.deleted_at IS NULL
           WHERE t.assigned_to_id = ${user.id}
             AND t.deleted_at IS NULL
+            AND t.task_type = 'research'
         )`),
       };
     }
@@ -292,6 +293,7 @@ export class AnalyticsService {
       });
 
       // Get task counts per study, then aggregate by project
+      // Only count research tasks (admin tasks don't contribute to progress)
       const taskStats = studyIds.length > 0
         ? await Task.findAll({
             transaction,
@@ -308,7 +310,10 @@ export class AnalyticsService {
           'completedTasks',
         ],
       ],
-            where: { studyId: { [Op.in]: studyIds } },
+            where: { 
+              studyId: { [Op.in]: studyIds },
+              taskType: 'research', // Only research tasks count toward progress
+            },
             group: ['studyId'],
       raw: true,
           })
@@ -608,6 +613,7 @@ export class AnalyticsService {
           INNER JOIN projects p ON p.id = s.project_id AND p.deleted_at IS NULL
           WHERE t.assigned_to_id = ${user.id}
             AND t.deleted_at IS NULL
+            AND t.task_type = 'research'
         )`),
       };
     }
@@ -670,7 +676,9 @@ export class AnalyticsService {
     transaction?: Transaction
   ) {
     try {
-    const whereClause: any = {};
+    const whereClause: any = {
+      taskType: 'research', // Only research tasks are included in analytics
+    };
 
     if (studyId) {
       whereClause.studyId = studyId;
@@ -1229,6 +1237,7 @@ export class AnalyticsService {
           INNER JOIN projects p ON p.id = s.project_id AND p.deleted_at IS NULL
           WHERE t.assigned_to_id = ${user.id}
             AND t.deleted_at IS NULL
+            AND t.task_type = 'research'
         )`),
       };
     }
@@ -1246,6 +1255,7 @@ export class AnalyticsService {
             INNER JOIN studies s ON s.id = t.study_id AND s.deleted_at IS NULL
             WHERE t.study_id = Study.id
               AND t.deleted_at IS NULL
+              AND t.task_type = 'research'
           )`),
           'totalTasks',
         ],
@@ -1256,6 +1266,7 @@ export class AnalyticsService {
             INNER JOIN studies s ON s.id = t.study_id AND s.deleted_at IS NULL
             WHERE t.study_id = Study.id
               AND t.deleted_at IS NULL
+              AND t.task_type = 'research'
               AND t.status = '${TaskStatus.COMPLETED}'
           )`),
           'completedTasks',

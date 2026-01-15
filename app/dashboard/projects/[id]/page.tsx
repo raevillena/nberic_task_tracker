@@ -3,22 +3,38 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchProjectByIdThunk, deleteProjectThunk, updateProjectThunk } from '@/store/slices/projectSlice';
 import { fetchStudiesByProjectThunk, selectStudiesByProjectId } from '@/store/slices/studySlice';
 import { UserRole } from '@/types/entities';
 import Link from 'next/link';
+import { useNavigationHistory } from '@/hooks/useNavigationHistory';
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const pathname = usePathname();
   const dispatch = useAppDispatch();
+  const { getReferrer } = useNavigationHistory();
   const projectId = parseInt(params.id as string, 10);
+  
+  // Get back URL - check if came from projects list or studies list
+  const backUrl = getReferrer(
+    pathname,
+    '/dashboard/projects'
+  );
 
   const project = useAppSelector((state) => 
     projectId && !isNaN(projectId) ? state.project.entities[projectId] : undefined
   );
+
+  // Build breadcrumbs
+  const breadcrumbItems = [
+    { label: 'Projects', href: '/dashboard/projects' },
+    { label: project?.name || 'Project', href: '#' }
+  ];
   const projectLoading = useAppSelector((state) => state.project.isLoading);
   const projectError = useAppSelector((state) => state.project.error);
   const studies = useAppSelector((state) => 
@@ -121,8 +137,8 @@ export default function ProjectDetailPage() {
     return (
       <div className="text-center py-8">
         <p className="text-red-600 mb-4">{projectError}</p>
-        <Link href="/dashboard/projects" className="text-indigo-600 hover:text-indigo-700">
-          Back to Projects
+        <Link href={backUrl} className="text-indigo-600 hover:text-indigo-700">
+          Back
         </Link>
       </div>
     );
@@ -132,8 +148,8 @@ export default function ProjectDetailPage() {
     return (
       <div className="text-center py-8">
         <p className="text-gray-500 mb-4">Project not found</p>
-        <Link href="/dashboard/projects" className="text-indigo-600 hover:text-indigo-700">
-          Back to Projects
+        <Link href={backUrl} className="text-indigo-600 hover:text-indigo-700">
+          Back
         </Link>
       </div>
     );
@@ -142,8 +158,9 @@ export default function ProjectDetailPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link href="/dashboard" className="text-indigo-600 hover:text-indigo-700 mb-4 inline-block">
-          ← Back to Projects
+        <Breadcrumbs items={breadcrumbItems} />
+        <Link href={backUrl} className="text-indigo-600 hover:text-indigo-700 mb-4 inline-block">
+          ← Back
         </Link>
         <div className="flex justify-between items-center">
           <div>
@@ -212,6 +229,11 @@ export default function ProjectDetailPage() {
               <Link
                 key={study.id}
                 href={`/dashboard/projects/${projectId}/studies/${study.id}`}
+                onClick={() => {
+                  // Store referrer for back navigation
+                  const studyPath = `/dashboard/projects/${projectId}/studies/${study.id}`;
+                  sessionStorage.setItem(`referrer:${studyPath}`, `/dashboard/projects/${projectId}`);
+                }}
                 className="block p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
               >
                 <h3 className="text-lg font-semibold mb-2">{study.name}</h3>

@@ -3,7 +3,7 @@
 import { Transaction, Op } from 'sequelize';
 import { Task, Study, User, Project, TaskRequest, TaskAssignment, TaskRead } from '@/lib/db/models';
 import { createNotification } from './notificationService';
-import { TaskStatus, TaskPriority, UserRole, TaskRequestType, TaskRequestStatus } from '@/types/entities';
+import { TaskStatus, TaskPriority, UserRole, TaskRequestType, TaskRequestStatus, TaskType } from '@/types/entities';
 import { CreateTaskRequest, UpdateTaskRequest } from '@/types/api';
 import { UserContext } from '@/types/rbac';
 import { PermissionError, NotFoundError, ValidationError } from '@/lib/utils/errors';
@@ -12,6 +12,7 @@ import { sequelize } from '@/lib/db/connection';
 
 /**
  * Get all tasks (with RBAC filtering)
+ * Returns both research and admin tasks
  */
 export async function getAllTasks(user: UserContext): Promise<Task[]> {
   // Build query
@@ -39,6 +40,8 @@ export async function getAllTasks(user: UserContext): Promise<Task[]> {
   }
   
   // Build base includes (always include these)
+  // Study is optional (admin tasks don't have studyId)
+  // Project is optional (research tasks get project via study, admin tasks have direct project)
   const baseIncludes: any[] = [
     { model: User, as: 'assignedTo', attributes: ['id', 'email', 'firstName', 'lastName'] },
     { model: User, as: 'createdBy', attributes: ['id', 'email', 'firstName', 'lastName'] },
@@ -46,6 +49,7 @@ export async function getAllTasks(user: UserContext): Promise<Task[]> {
       model: Study,
       as: 'study',
       attributes: ['id', 'name', 'projectId'],
+      required: false, // Optional for admin tasks
       include: [
         {
           model: Project,
@@ -53,6 +57,12 @@ export async function getAllTasks(user: UserContext): Promise<Task[]> {
           attributes: ['id', 'name'],
         },
       ],
+    },
+    {
+      model: Project,
+      as: 'project',
+      attributes: ['id', 'name'],
+      required: false, // Optional - only for admin tasks
     },
   ];
 
@@ -65,7 +75,7 @@ export async function getAllTasks(user: UserContext): Promise<Task[]> {
         {
           model: User,
           as: 'assignedResearchers',
-          through: { attributes: [] },
+          through: { attributes: ['assignedAt'] },
           attributes: ['id', 'email', 'firstName', 'lastName'],
         },
       ],
@@ -88,6 +98,7 @@ export async function getAllTasks(user: UserContext): Promise<Task[]> {
 
 /**
  * Get tasks for a study with optional filtering
+ * Only returns research tasks (admin tasks don't belong to studies)
  */
 export async function getTasksByStudy(
   studyId: number,
@@ -99,8 +110,11 @@ export async function getTasksByStudy(
     throw new NotFoundError(`Study ${studyId} not found`);
   }
 
-  // Build query
-  const where: any = { studyId };
+  // Build query - only research tasks belong to studies
+  const where: any = { 
+    studyId,
+    taskType: TaskType.RESEARCH, // Only research tasks
+  };
 
   // Researchers can only see assigned tasks (check both legacy and many-to-many)
   if (user.role === UserRole.RESEARCHER) {
@@ -158,7 +172,7 @@ export async function getTasksByStudy(
         {
           model: User,
           as: 'assignedResearchers',
-          through: { attributes: [] },
+          through: { attributes: ['assignedAt'] },
           attributes: ['id', 'email', 'firstName', 'lastName'],
         },
       ],
@@ -187,10 +201,12 @@ export async function getTaskById(
   user: UserContext
 ): Promise<Task> {
   // Build base includes (always include these)
+  // Study is optional (nullable for admin tasks)
   const baseIncludes: any[] = [
     { 
       model: Study, 
-      as: 'study', 
+      as: 'study',
+      required: false, // Optional for admin tasks
       include: [
         { model: User, as: 'createdBy' },
         {
@@ -199,6 +215,12 @@ export async function getTaskById(
           attributes: ['id', 'name'],
         },
       ],
+    },
+    {
+      model: Project,
+      as: 'project',
+      attributes: ['id', 'name'],
+      required: false, // Optional - only for admin tasks
     },
     { model: User, as: 'assignedTo' },
     { model: User, as: 'createdBy' },
@@ -214,7 +236,7 @@ export async function getTaskById(
         {
           model: User,
           as: 'assignedResearchers',
-          through: { attributes: [] },
+          through: { attributes: ['assignedAt'] },
           attributes: ['id', 'email', 'firstName', 'lastName'],
         },
       ],
@@ -250,22 +272,42 @@ export async function getTaskById(
 
 /**
  * Create a new task
+ * Supports both research tasks (with studyId) and admin tasks (with projectId, no studyId)
  */
 export async function createTask(
-  studyId: number,
+  studyId: number | null,
   data: CreateTaskRequest,
   user: UserContext,
   transaction?: Transaction
 ): Promise<Task> {
-  // Verify study exists
-  const study = await Study.findByPk(studyId, { transaction });
-  if (!study) {
-    throw new NotFoundError(`Study ${studyId} not found`);
-  }
-
   // Only managers can create tasks
   if (user.role !== UserRole.MANAGER) {
     throw new PermissionError('Only managers can create tasks');
+  }
+
+  // Determine task type (default to RESEARCH for backward compatibility)
+  const taskType = (data.taskType as TaskType) || TaskType.RESEARCH;
+
+  // Validate task type rules
+  if (taskType === TaskType.RESEARCH) {
+    // Research tasks require studyId
+    if (!studyId) {
+      throw new ValidationError('Research tasks must have a studyId');
+    }
+    // Verify study exists
+    const study = await Study.findByPk(studyId, { transaction });
+    if (!study) {
+      throw new NotFoundError(`Study ${studyId} not found`);
+    }
+  } else if (taskType === TaskType.ADMIN) {
+    // Admin tasks are independent - they don't require studyId or projectId
+    // If projectId is provided, verify it exists, but it's optional
+    if (data.projectId) {
+      const project = await Project.findByPk(data.projectId, { transaction });
+      if (!project) {
+        throw new NotFoundError(`Project ${data.projectId} not found`);
+      }
+    }
   }
 
   // Validate assigned user if provided
@@ -281,7 +323,9 @@ export async function createTask(
 
   const task = await Task.create(
     {
-      studyId,
+      taskType,
+      studyId: taskType === TaskType.RESEARCH ? studyId : null,
+      projectId: taskType === TaskType.ADMIN ? (data.projectId || null) : null,
       name: data.name,
       description: data.description,
       priority: data.priority || TaskPriority.MEDIUM,
@@ -293,8 +337,10 @@ export async function createTask(
     { transaction }
   );
 
-  // Update progress chain (uses same transaction if provided)
-  await progressService.updateProgressChain(task.studyId, transaction);
+  // Update progress chain only for research tasks (uses same transaction if provided)
+  if (taskType === TaskType.RESEARCH && studyId) {
+    await progressService.updateProgressChain(studyId, transaction);
+  }
 
   // Try to reload with assignedResearchers, fallback if table doesn't exist
   try {
@@ -385,8 +431,8 @@ export async function updateTask(
     dueDate: data.dueDate ? new Date(data.dueDate) : null,
   });
 
-  // Update progress chain if status changed
-  if (data.status) {
+  // Update progress chain if status changed (only for research tasks)
+  if (data.status && task.taskType === TaskType.RESEARCH && task.studyId) {
     await progressService.updateProgressChain(task.studyId);
   }
 
@@ -495,8 +541,10 @@ export async function completeTask(
     { transaction }
   );
 
-  // Update progress chain (uses same transaction if provided)
-  await progressService.updateProgressChain(task.studyId, transaction);
+  // Update progress chain only for research tasks (uses same transaction if provided)
+  if (task.taskType === TaskType.RESEARCH && task.studyId) {
+    await progressService.updateProgressChain(task.studyId, transaction);
+  }
 
   // Try to reload with assignedResearchers, fallback if table doesn't exist
   try {
@@ -565,8 +613,10 @@ export async function deleteTask(
   // Soft delete - set deletedAt timestamp
   await task.update({ deletedAt: new Date() }, { transaction });
 
-  // Update progress chain (uses same transaction if provided)
-  await progressService.updateProgressChain(studyId, transaction);
+  // Update progress chain only for research tasks (uses same transaction if provided)
+  if (task.taskType === TaskType.RESEARCH && studyId) {
+    await progressService.updateProgressChain(studyId, transaction);
+  }
 }
 
 /**
@@ -594,13 +644,16 @@ export async function restoreTask(
   await task.update({ deletedAt: null });
   await task.reload({ 
     include: [
-      { model: Study, as: 'study', attributes: ['id', 'name', 'projectId'] },
+      { model: Study, as: 'study', attributes: ['id', 'name', 'projectId'], required: false },
+      { model: Project, as: 'project', attributes: ['id', 'name'], required: false },
       { model: User, as: 'createdBy', attributes: ['id', 'email', 'firstName', 'lastName'] },
     ] 
   });
   
-  // Update progress chain after restoration
-  await progressService.updateProgressChain(task.studyId);
+  // Update progress chain after restoration (only for research tasks)
+  if (task.taskType === TaskType.RESEARCH && task.studyId) {
+    await progressService.updateProgressChain(task.studyId);
+  }
   
   return task;
 }
@@ -616,13 +669,127 @@ export async function getTrashTasks(user: UserContext): Promise<Task[]> {
 
   const tasks = await Task.scope('onlyDeleted').findAll({
     include: [
-      { model: Study, as: 'study', attributes: ['id', 'name', 'projectId'], include: [{ model: Project, as: 'project', attributes: ['id', 'name'] }] },
+      { model: Study, as: 'study', attributes: ['id', 'name', 'projectId'], required: false, include: [{ model: Project, as: 'project', attributes: ['id', 'name'] }] },
+      { model: Project, as: 'project', attributes: ['id', 'name'], required: false },
       { model: User, as: 'createdBy', attributes: ['id', 'email', 'firstName', 'lastName'] },
     ],
     order: [['deletedAt', 'DESC']],
   });
 
   return tasks;
+}
+
+/**
+ * Get tasks for a project (both research and admin tasks)
+ */
+export async function getTasksByProject(
+  projectId: number,
+  user: UserContext
+): Promise<Task[]> {
+  // Verify project exists
+  const project = await Project.findByPk(projectId);
+  if (!project) {
+    throw new NotFoundError(`Project ${projectId} not found`);
+  }
+
+  // Build query - tasks can belong to project via:
+  // 1. Admin tasks with projectId
+  // 2. Research tasks via study.projectId
+  const where: any = {
+    [Op.or]: [
+      { projectId }, // Direct admin task relationship
+      { 
+        // Research tasks via study
+        taskType: TaskType.RESEARCH,
+        '$study.projectId$': projectId,
+      },
+    ],
+  };
+
+  // Researchers can only see assigned tasks (check both legacy and many-to-many)
+  if (user.role === UserRole.RESEARCHER) {
+    try {
+      // Get task IDs from task_assignments table
+      const assignedTaskIds = await TaskAssignment.findAll({
+        where: { userId: user.id },
+        attributes: ['taskId'],
+        raw: true,
+      }).then((assignments) => assignments.map((a: any) => a.taskId));
+
+      // Use Op.and to combine project filter with assignment filter
+      where[Op.and] = [
+        where[Op.or],
+        {
+          [Op.or]: [
+            { assignedToId: user.id },
+            ...(assignedTaskIds.length > 0 ? [{ id: { [Op.in]: assignedTaskIds } }] : []),
+          ],
+        },
+      ];
+      delete where[Op.or];
+    } catch (taskAssignmentError) {
+      // Fallback to legacy assignedToId only if TaskAssignment table doesn't exist
+      where[Op.and] = [
+        where[Op.or],
+        { assignedToId: user.id },
+      ];
+      delete where[Op.or];
+    }
+  }
+  
+  // Build base includes
+  const baseIncludes: any[] = [
+    { model: User, as: 'assignedTo', attributes: ['id', 'email', 'firstName', 'lastName'] },
+    { model: User, as: 'createdBy', attributes: ['id', 'email', 'firstName', 'lastName'] },
+    {
+      model: Study,
+      as: 'study',
+      attributes: ['id', 'name', 'projectId'],
+      required: false, // Optional for admin tasks
+      include: [
+        {
+          model: Project,
+          as: 'project',
+          attributes: ['id', 'name'],
+        },
+      ],
+    },
+    {
+      model: Project,
+      as: 'project',
+      attributes: ['id', 'name'],
+      required: false, // Optional - only for admin tasks
+    },
+  ];
+
+  // Try to include assignedResearchers, but fallback if table doesn't exist
+  try {
+    const tasks = await Task.findAll({
+      where,
+      include: [
+        ...baseIncludes,
+        {
+          model: User,
+          as: 'assignedResearchers',
+          through: { attributes: ['assignedAt'] },
+          attributes: ['id', 'email', 'firstName', 'lastName'],
+        },
+      ],
+      order: [['createdAt', 'DESC']],
+    });
+    return tasks;
+  } catch (findAllError: any) {
+    // If error is about missing task_assignments table, retry without assignedResearchers include
+    if (findAllError?.message?.includes('task_assignments') || findAllError?.name === 'SequelizeDatabaseError') {
+      const tasks = await Task.findAll({
+        where,
+        include: baseIncludes,
+        order: [['createdAt', 'DESC']],
+      });
+      return tasks;
+    }
+    throw findAllError;
+  }
 }
 
 
@@ -1089,7 +1256,10 @@ export async function approveTaskRequest(
       throw new Error('Failed to update task status to completed');
     }
     
-    await progressService.updateProgressChain(task.studyId, transaction);
+    // Update progress chain only for research tasks
+    if (task.taskType === TaskType.RESEARCH && task.studyId) {
+      await progressService.updateProgressChain(task.studyId, transaction);
+    }
   } else if (request.requestType === TaskRequestType.REASSIGNMENT) {
     // Update request status first
     await request.update(

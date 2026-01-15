@@ -7,6 +7,7 @@ import { CreateTaskRequest } from '@/types/api';
 import { createNotification } from '@/services/notificationService';
 import { emitTaskAssigned } from '@/lib/socket/taskRequestEvents';
 import { Task, User, Study } from '@/lib/db/models';
+import { TaskType } from '@/types/entities';
 
 /**
  * GET /api/projects/[id]/studies/[studyId]/tasks
@@ -71,7 +72,14 @@ export async function POST(
     }
 
     const body: CreateTaskRequest = await request.json();
-    const task = await createTask(studyId, body, user);
+    
+    // Ensure taskType is RESEARCH for study-level tasks (default behavior)
+    const taskData: CreateTaskRequest = {
+      ...body,
+      taskType: TaskType.RESEARCH, // Study tasks are always research tasks
+    };
+    
+    const task = await createTask(studyId, taskData, user);
 
     // If task was created with an initial assignment, create notification and emit socket event
     if (task.assignedToId) {

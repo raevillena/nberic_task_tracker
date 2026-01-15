@@ -3,7 +3,7 @@
 import { Transaction } from 'sequelize';
 import { sequelize } from '@/lib/db/connection';
 import { Task, Study, Project } from '@/lib/db/models';
-import { TaskStatus } from '@/types/entities';
+import { TaskStatus, TaskType } from '@/types/entities';
 import { DatabaseError } from '@/lib/utils/errors';
 
 /**
@@ -25,9 +25,12 @@ export class ProgressService {
       throw new DatabaseError(`Study with ID ${studyId} not found`);
     }
 
-    // Count total tasks and completed tasks
+    // Count total tasks and completed tasks (only research tasks contribute to progress)
     const totalTasks = await Task.count({
-      where: { studyId },
+      where: { 
+        studyId,
+        taskType: TaskType.RESEARCH, // Only research tasks count toward progress
+      },
       transaction,
     });
 
@@ -41,6 +44,7 @@ export class ProgressService {
     const completedTasks = await Task.count({
       where: {
         studyId,
+        taskType: TaskType.RESEARCH, // Only research tasks count toward progress
         status: TaskStatus.COMPLETED,
       },
       transaction,

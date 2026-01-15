@@ -57,8 +57,11 @@ export default function ProjectsPage() {
           console.error('Failed to mark project as read:', error);
         });
     }
+    // Store referrer for back navigation
+    const projectPath = `/dashboard/projects/${projectId}`;
+    sessionStorage.setItem(`referrer:${projectPath}`, '/dashboard/projects');
     // Navigate to project detail
-    router.push(`/dashboard/projects/${projectId}`);
+    router.push(projectPath);
   };
 
   return (

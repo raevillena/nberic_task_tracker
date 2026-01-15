@@ -48,7 +48,9 @@ async function getUsersForRoomNotification(
   switch (roomType) {
     case 'task': {
       // Get task with assignments
-      const task = await Task.findByPk(roomId, {
+      // Use unscoped() to bypass soft-delete default scope - we want to notify
+      // even if task is soft-deleted (users may still have the chat open)
+      const task = await Task.unscoped().findByPk(roomId, {
         include: [
           { model: User, as: 'createdBy', attributes: ['id'] },
           { model: User, as: 'assignedTo', attributes: ['id'] },
@@ -59,7 +61,7 @@ async function getUsersForRoomNotification(
             attributes: ['id'],
           },
           {
-            model: Study,
+            model: Study.unscoped(),
             as: 'study',
             attributes: ['id', 'projectId'],
           },
@@ -316,21 +318,35 @@ export function setupMessageHandlers(socket: TypedSocket, io: TypedIO): void {
 
       if (roomType === 'task') {
         taskId = roomId;
-        // Load task to get study and project
+        // Load task to get study and project (for both research and admin tasks)
         const task = await Task.findByPk(roomId, {
           include: [
             {
               model: Study,
               as: 'study',
               attributes: ['id', 'projectId'],
+              required: false, // Optional for admin tasks
+            },
+            {
+              model: Project,
+              as: 'project',
+              attributes: ['id'],
+              required: false, // Optional - only for admin tasks
             },
           ],
         });
-        // Type cast to access included relation
-        const taskWithStudy = task as Task & { study?: Study };
-        if (taskWithStudy?.study) {
-          studyId = taskWithStudy.study.id;
-          projectId = taskWithStudy.study.projectId;
+        // Type cast to access included relations
+        const taskWithRelations = task as Task & { study?: Study; project?: Project };
+        if (taskWithRelations?.study) {
+          // Research task - get projectId from study
+          studyId = taskWithRelations.study.id;
+          projectId = taskWithRelations.study.projectId;
+        } else if (taskWithRelations?.project) {
+          // Admin task with project - use direct projectId
+          projectId = taskWithRelations.project.id;
+        } else if (taskWithRelations?.projectId) {
+          // Admin task with projectId but project not loaded
+          projectId = taskWithRelations.projectId;
         }
       } else if (roomType === 'study') {
         studyId = roomId;
@@ -347,7 +363,14 @@ export function setupMessageHandlers(socket: TypedSocket, io: TypedIO): void {
       // Build action URL
       let actionUrl = '';
       if (taskId && studyId && projectId) {
+        // Research task
         actionUrl = `/dashboard/projects/${projectId}/studies/${studyId}/tasks/${taskId}`;
+      } else if (taskId && projectId) {
+        // Admin task with project
+        actionUrl = `/dashboard/projects/${projectId}/tasks/${taskId}`;
+      } else if (taskId) {
+        // Standalone admin task
+        actionUrl = `/dashboard/tasks/${taskId}`;
       } else if (studyId && projectId) {
         actionUrl = `/dashboard/projects/${projectId}/studies/${studyId}`;
       } else if (projectId) {
@@ -361,24 +384,27 @@ export function setupMessageHandlers(socket: TypedSocket, io: TypedIO): void {
         userId
       );
 
+      // Build notification data once for reuse
+      const messagePreview =
+        type === 'text'
+          ? content.substring(0, 100)
+          : type === 'image'
+          ? '📷 Image'
+          : '📎 File';
+      
+      const notificationTitle =
+        roomType === 'task'
+          ? 'New message in task'
+          : roomType === 'study'
+          ? 'New message in study'
+          : 'New message in project';
+
       // Create database notifications for all users with room access (except sender)
       // This ensures notifications are created even if users aren't currently in the room
       const notificationPromises = userIdsToNotify.map((targetUserId) => {
-        const messagePreview =
-          type === 'text'
-            ? content.substring(0, 100)
-            : type === 'image'
-            ? '📷 Image'
-            : '📎 File';
-
         return createNotification(targetUserId, {
           type: 'message',
-          title:
-            roomType === 'task'
-              ? 'New message in task'
-              : roomType === 'study'
-              ? 'New message in study'
-              : 'New message in project',
+          title: notificationTitle,
           message: messagePreview,
           roomType,
           roomId,
@@ -395,12 +421,10 @@ export function setupMessageHandlers(socket: TypedSocket, io: TypedIO): void {
         });
       });
 
-      // Don't await - create notifications in background
-      Promise.all(notificationPromises).catch((err) => {
-        console.error('Error creating message notifications:', err);
-      });
+      // AWAIT notification creation so we can emit socket events after
+      await Promise.all(notificationPromises);
 
-      // Broadcast to room (including sender) - for real-time updates
+      // Broadcast to room (including sender) - for real-time chat updates
       const roomKey = `${roomType}:${roomId}`;
       io.to(roomKey).emit('message:new', {
         message: message.toJSON() as MessageType,
@@ -409,6 +433,33 @@ export function setupMessageHandlers(socket: TypedSocket, io: TypedIO): void {
       // Also send directly to sender to ensure they see their message immediately
       socket.emit('message:new', {
         message: message.toJSON() as MessageType,
+      });
+
+      // CRITICAL: Emit notification:new to ALL target users (not just those in the room)
+      // This ensures users on the dashboard who haven't opened the chat get toast notifications
+      const notificationPayload = {
+        id: `msg-${message.id}-${Date.now()}`,
+        type: 'message' as const,
+        title: notificationTitle,
+        message: messagePreview,
+        roomType,
+        roomId,
+        taskId,
+        projectId,
+        studyId,
+        senderId: userId,
+        senderName,
+        actionUrl,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Emit to each target user individually
+      // io.emit broadcasts to ALL clients, then clients filter by targetUserId
+      userIdsToNotify.forEach((targetUserId) => {
+        io.emit('notification:new', {
+          notification: notificationPayload,
+          targetUserId,
+        });
       });
     } catch (error) {
       // Log the actual error for debugging

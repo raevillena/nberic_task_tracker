@@ -3,7 +3,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchStudyByIdThunk, updateStudyThunk, deleteStudyThunk } from '@/store/slices/studySlice';
 import { fetchTasksByStudyThunk, selectTasksByStudyId, createTaskThunk } from '@/store/slices/taskSlice';
@@ -11,13 +11,23 @@ import { fetchProjectByIdThunk } from '@/store/slices/projectSlice';
 import { addNotification } from '@/store/slices/notificationSlice';
 import { TaskStatus, TaskPriority, UserRole } from '@/types/entities';
 import Link from 'next/link';
+import { useNavigationHistory } from '@/hooks/useNavigationHistory';
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 
 export default function StudyDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const pathname = usePathname();
   const dispatch = useAppDispatch();
+  const { getReferrer } = useNavigationHistory();
   const projectId = parseInt(params.id as string, 10);
   const studyId = parseInt(params.studyId as string, 10);
+  
+  // Get back URL - check if came from studies list or project page
+  const backUrl = getReferrer(
+    pathname,
+    `/dashboard/projects/${projectId}`
+  );
 
   const study = useAppSelector((state) =>
     studyId && !isNaN(studyId) ? state.study.entities[studyId] : undefined
@@ -25,6 +35,31 @@ export default function StudyDetailPage() {
   const project = useAppSelector((state) =>
     projectId && !isNaN(projectId) ? state.project.entities[projectId] : undefined
   );
+
+  // Build breadcrumbs based on where user came from
+  const breadcrumbItems = (() => {
+    if (typeof window === 'undefined') return [];
+    
+    const referrer = sessionStorage.getItem(`referrer:${pathname}`);
+    const items = [];
+    
+    if (referrer === '/dashboard/studies') {
+      // Came from all studies page
+      items.push(
+        { label: 'All Studies', href: '/dashboard/studies' },
+        { label: study?.name || 'Study', href: '#' }
+      );
+    } else {
+      // Came from project page - show hierarchy
+      items.push(
+        { label: 'Projects', href: '/dashboard/projects' },
+        { label: project?.name || 'Project', href: `/dashboard/projects/${projectId}` },
+        { label: study?.name || 'Study', href: '#' }
+      );
+    }
+    
+    return items;
+  })();
   const isLoading = useAppSelector((state) => state.study.isLoading);
   const isUpdating = useAppSelector((state) => state.study.isUpdating);
   const isDeleting = useAppSelector((state) => state.study.isDeleting);
@@ -246,6 +281,43 @@ export default function StudyDetailPage() {
     }
   };
 
+  const formatDate = (date: Date | string | null) => {
+    if (!date) return 'No date';
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  // Helper to get assigned date from task
+  // Checks TaskAssignment assignedAt first, then falls back to task createdAt for legacy assignments
+  const getAssignedDate = (task: any): Date | string | null => {
+    // Check if task has assignedResearchers with through data (many-to-many)
+    if (task.assignedResearchers && Array.isArray(task.assignedResearchers) && task.assignedResearchers.length > 0) {
+      // Get the earliest assignment date
+      // Sequelize through data is accessible as taskAssignment (camelCase) or TaskAssignment
+      const assignmentDates = task.assignedResearchers
+        .map((r: any) => {
+          // Try both camelCase and PascalCase property names
+          return (r as any).taskAssignment?.assignedAt || (r as any).TaskAssignment?.assignedAt;
+        })
+        .filter(Boolean)
+        .sort((a: Date, b: Date) => new Date(a).getTime() - new Date(b).getTime());
+      
+      if (assignmentDates.length > 0) {
+        return assignmentDates[0];
+      }
+    }
+    
+    // Fallback to task createdAt for legacy assignments (assignedToId)
+    if (task.assignedToId) {
+      return task.createdAt;
+    }
+    
+    return null;
+  };
+
   if (isLoading && !study) {
     return (
       <div className="text-center py-12">
@@ -259,8 +331,8 @@ export default function StudyDetailPage() {
     return (
       <div className="text-center py-8">
         <p className="text-red-600 mb-4">{error}</p>
-        <Link href={`/dashboard/projects/${projectId}`} className="text-indigo-600 hover:text-indigo-700">
-          Back to Project
+        <Link href={backUrl} className="text-indigo-600 hover:text-indigo-700">
+          Back
         </Link>
       </div>
     );
@@ -270,8 +342,8 @@ export default function StudyDetailPage() {
     return (
       <div className="text-center py-8">
         <p className="text-gray-500 mb-4">Study not found</p>
-        <Link href={`/dashboard/projects/${projectId}`} className="text-indigo-600 hover:text-indigo-700">
-          Back to Project
+        <Link href={backUrl} className="text-indigo-600 hover:text-indigo-700">
+          Back
         </Link>
       </div>
     );
@@ -284,11 +356,12 @@ export default function StudyDetailPage() {
   return (
     <div>
       <div className="mb-6">
+        <Breadcrumbs items={breadcrumbItems} />
         <Link
-          href={`/dashboard/projects/${projectId}`}
+          href={backUrl}
           className="text-indigo-600 hover:text-indigo-700 mb-4 inline-block"
         >
-          ← Back to Project
+          ← Back
         </Link>
         <div className="flex justify-between items-start">
           <div className="flex-1">
@@ -504,6 +577,9 @@ export default function StudyDetailPage() {
                       Assigned To
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Assigned Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Priority
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -524,6 +600,11 @@ export default function StudyDetailPage() {
                           )}
                           <Link
                             href={`/dashboard/projects/${projectId}/studies/${studyId}/tasks/${task.id}`}
+                            onClick={() => {
+                              // Store referrer for back navigation
+                              const taskPath = `/dashboard/projects/${projectId}/studies/${studyId}/tasks/${task.id}`;
+                              sessionStorage.setItem(`referrer:${taskPath}`, `/dashboard/projects/${projectId}/studies/${studyId}`);
+                            }}
                             className={`text-sm font-medium hover:text-indigo-900 ${
                               !(task as any).isRead ? 'text-indigo-700 font-semibold' : 'text-indigo-600'
                             }`}
@@ -540,9 +621,21 @@ export default function StudyDetailPage() {
                           <div className="text-sm text-gray-900">
                             {task.assignedTo.firstName} {task.assignedTo.lastName}
                           </div>
+                        ) : task.assignedResearchers && task.assignedResearchers.length > 0 ? (
+                          <div className="text-sm text-gray-900">
+                            {task.assignedResearchers.map((r: any, idx: number) => (
+                              <div key={r.id}>
+                                {r.firstName} {r.lastName}
+                                {idx < task.assignedResearchers.length - 1 && ', '}
+                              </div>
+                            ))}
+                          </div>
                         ) : (
                           <span className="text-sm text-gray-400">Unassigned</span>
                         )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(getAssignedDate(task))}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span

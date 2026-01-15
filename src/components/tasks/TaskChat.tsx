@@ -27,8 +27,8 @@ import { FileViewer } from '@/components/files/fileViewer';
 interface TaskChatProps {
   taskId: number;
   taskName: string;
-  projectId: number;
-  studyId: number;
+  projectId?: number;
+  studyId?: number;
 }
 
 export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps) {

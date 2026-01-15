@@ -340,3 +340,242 @@
 [ROOM:JOIN] User 4 (Manager) attempting to join task:29
 [ROOM:JOIN] Access check result for task:29: true
 [ROOM:JOIN] User 4 successfully joined task:29, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 5 successfully joined task:29, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:29
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:29
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 5 successfully joined task:29, memberCount=1
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 5 successfully joined task:29, memberCount=1
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 5 successfully joined task:29, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 4 successfully joined task:29, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 4 successfully joined task:27, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 4 successfully joined task:27, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 4 successfully joined task:27, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:27
+[ROOM:JOIN] Access check result for task:27: true
+[ROOM:JOIN] User 4 successfully joined task:27, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 5 successfully joined task:29, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 4 successfully joined task:29, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 4 successfully joined task:29, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:26
+[ROOM:JOIN] Access check result for task:26: true
+[ROOM:JOIN] User 4 successfully joined task:26, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:29
+[ROOM:JOIN] Access check result for task:29: true
+[ROOM:JOIN] User 4 successfully joined task:29, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:28
+[ROOM:JOIN] Access check result for task:28: true
+[ROOM:JOIN] User 4 successfully joined task:28, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:25
+[ROOM:JOIN] Access check result for task:25: true
+[ROOM:JOIN] User 4 successfully joined task:25, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:25
+[ROOM:JOIN] Access check result for task:25: true
+[ROOM:JOIN] User 4 successfully joined task:25, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:30
+[ROOM:JOIN] Access check result for task:30: true
+[ROOM:JOIN] User 4 successfully joined task:30, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:30
+[ROOM:JOIN] Access check result for task:30: true
+[ROOM:JOIN] User 5 successfully joined task:30, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:30
+[ROOM:JOIN] Access check result for task:30: true
+[ROOM:JOIN] User 4 successfully joined task:30, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:30
+[ROOM:JOIN] Access check result for task:30: true
+[ROOM:JOIN] User 5 successfully joined task:30, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:30
+[ROOM:JOIN] Access check result for task:30: true
+[ROOM:JOIN] User 4 successfully joined task:30, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:30
+[ROOM:JOIN] Access check result for task:30: true
+[ROOM:JOIN] User 5 successfully joined task:30, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:30
+[ROOM:JOIN] Access check result for task:30: true
+[ROOM:JOIN] User 4 successfully joined task:30, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:30
+[ROOM:JOIN] Access check result for task:30: true
+[ROOM:JOIN] User 5 successfully joined task:30, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:30
+[ROOM:JOIN] Access check result for task:30: true
+[ROOM:JOIN] User 4 successfully joined task:30, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:30
+[ROOM:JOIN] Access check result for task:30: true
+[ROOM:JOIN] User 5 successfully joined task:30, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:30
+[ROOM:JOIN] User 4 (Manager) attempting to join task:30
+[ROOM:JOIN] Access check result for task:30: true
+[ROOM:JOIN] User 4 successfully joined task:30, memberCount=1
+[ROOM:JOIN] Access check result for task:30: true
+[ROOM:JOIN] User 5 successfully joined task:30, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:30
+[ROOM:JOIN] Access check result for task:30: true
+[ROOM:JOIN] User 4 successfully joined task:30, memberCount=1
+[EMIT-VIA-HTTP] Attempting to emit task:assigned to http://localhost:3001/emit
+[EMIT-VIA-HTTP] Response status: 200, ok: true
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=2
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=2
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=2
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=2
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=1
+[ROOM:JOIN] User 5 (Researcher) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 5 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2
+[ROOM:JOIN] User 4 (Manager) attempting to join task:31
+[ROOM:JOIN] Access check result for task:31: true
+[ROOM:JOIN] User 4 successfully joined task:31, memberCount=2

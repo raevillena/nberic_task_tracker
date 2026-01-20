@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTasksByProject, createTask, getTasksReadStatus } from '@/services/taskService';
 import { getAuthenticatedUser, createErrorResponse, getErrorStatusCode } from '../../../middleware';
 import { CreateTaskRequest } from '@/types/api';
-import { createNotification } from '@/services/notificationService';
+import { createAndEmitNotification } from '@/services/notificationService';
 import { emitTaskAssigned } from '@/lib/socket/taskRequestEvents';
 import { Task, User, Project } from '@/lib/db/models';
 import { TaskType } from '@/types/entities';
@@ -100,18 +100,21 @@ export async function POST(
         ],
       });
 
-      const creatorName = reloadedTask.createdBy
-        ? `${reloadedTask.createdBy.firstName} ${reloadedTask.createdBy.lastName}`
+      const taskData = reloadedTask as any;
+      // Use taskData to access included relations (createdBy is loaded via include)
+      const creatorName = taskData.createdBy
+        ? `${taskData.createdBy.firstName} ${taskData.createdBy.lastName}`
         : 'A manager';
 
       // Create DB notification for assigned researcher FIRST (await to ensure it's created)
-      await createNotification(reloadedTask.assignedToId, {
+      // assignedToId is guaranteed to be non-null here due to the check on line 89
+      await createAndEmitNotification(reloadedTask.assignedToId!, {
         type: 'task',
         title: 'New Task Assigned',
         message: `${creatorName} assigned you to task "${reloadedTask.name}"`,
         taskId: reloadedTask.id,
         projectId: reloadedTask.projectId || projectId,
-        studyId: null, // Admin tasks don't have studyId
+        studyId: undefined, // Admin tasks don't have studyId
         senderId: reloadedTask.createdById,
         senderName: creatorName,
         actionUrl: reloadedTask.projectId
@@ -123,7 +126,7 @@ export async function POST(
       });
 
       // Emit socket event AFTER notification is created (so client can refresh and see it)
-      emitTaskAssigned(reloadedTask, [reloadedTask.assignedToId]).catch((err) => {
+      emitTaskAssigned(reloadedTask, [reloadedTask.assignedToId!]).catch((err) => {
         console.error('Failed to emit task:assigned event:', err);
       });
     }

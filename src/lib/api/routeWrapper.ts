@@ -2,7 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest, AuthenticatedRequest } from '@/lib/auth/middleware';
-import { requirePermission, RBACOptions } from '@/lib/rbac/guards';
+import { requirePermission } from '@/lib/rbac/guards';
+import { RBACOptions } from '@/types/rbac';
 import { AuthenticationError, PermissionError, ValidationError, NotFoundError } from '@/lib/utils/errors';
 
 type RouteHandler = (

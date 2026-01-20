@@ -5,8 +5,8 @@
 import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchProjectByIdThunk } from '@/store/slices/projectSlice';
-import { fetchStudiesByProjectThunk } from '@/store/slices/studySlice';
+import { fetchProjectByIdThunk, selectCurrentProject } from '@/store/slices/projectSlice';
+import { fetchStudiesByProjectThunk, selectStudiesByProjectId } from '@/store/slices/studySlice';
 import Link from 'next/link';
 
 export default function ProjectDetailPage() {
@@ -15,8 +15,11 @@ export default function ProjectDetailPage() {
   const dispatch = useAppDispatch();
   const projectId = parseInt(params.id as string, 10);
 
-  const { currentProject, isLoading: projectLoading } = useAppSelector((state) => state.project);
-  const { studies, isLoading: studiesLoading } = useAppSelector((state) => state.study);
+  // Use selectors to get data from normalized state
+  const currentProject = useAppSelector(selectCurrentProject);
+  const projectLoading = useAppSelector((state) => state.project.isLoading);
+  const studies = useAppSelector((state) => selectStudiesByProjectId(state, projectId));
+  const studiesLoading = useAppSelector((state) => state.study.isLoading);
   const { user } = useAppSelector((state) => state.auth);
 
   useEffect(() => {

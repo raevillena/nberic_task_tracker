@@ -73,6 +73,7 @@ export async function emitTaskRequestCreated(
     task: request.task
       ? {
           id: request.task.id,
+          taskType: request.task.taskType,
           name: request.task.name,
           description: request.task.description,
           status: request.task.status,
@@ -80,11 +81,13 @@ export async function emitTaskRequestCreated(
           dueDate: request.task.dueDate,
           assignedToId: request.task.assignedToId,
           createdById: request.task.createdById, // Include createdById to identify the manager
+          completedAt: request.task.completedAt,
+          completedById: request.task.completedById,
           studyId: request.task.studyId,
           projectId: (request.task as any).study?.projectId, // Get projectId from study relation
           createdAt: request.task.createdAt,
           updatedAt: request.task.updatedAt,
-        }
+        } as Task
       : ({} as Task),
     requestedBy: request.requestedBy
       ? {
@@ -93,7 +96,11 @@ export async function emitTaskRequestCreated(
           firstName: request.requestedBy.firstName,
           lastName: request.requestedBy.lastName,
           role: request.requestedBy.role,
-        }
+          isActive: request.requestedBy.isActive,
+          lastLoginAt: request.requestedBy.lastLoginAt,
+          createdAt: request.requestedBy.createdAt,
+          updatedAt: request.requestedBy.updatedAt,
+        } as User
       : ({} as User),
   };
 
@@ -152,6 +159,7 @@ export async function emitTaskRequestApproved(
     task: request.task
       ? {
           id: request.task.id,
+          taskType: request.task.taskType,
           name: request.task.name,
           description: request.task.description,
           status: request.task.status,
@@ -159,11 +167,13 @@ export async function emitTaskRequestApproved(
           dueDate: request.task.dueDate,
           assignedToId: request.task.assignedToId,
           createdById: request.task.createdById, // Include createdById
+          completedAt: request.task.completedAt,
+          completedById: request.task.completedById,
           studyId: request.task.studyId,
           projectId: (request.task as any).study?.projectId, // Get projectId from study relation
           createdAt: request.task.createdAt,
           updatedAt: request.task.updatedAt,
-        }
+        } as Task
       : ({} as Task),
     reviewedBy: request.reviewedBy
       ? {
@@ -172,7 +182,11 @@ export async function emitTaskRequestApproved(
           firstName: request.reviewedBy.firstName,
           lastName: request.reviewedBy.lastName,
           role: request.reviewedBy.role,
-        }
+          isActive: request.reviewedBy.isActive,
+          lastLoginAt: request.reviewedBy.lastLoginAt,
+          createdAt: request.reviewedBy.createdAt,
+          updatedAt: request.reviewedBy.updatedAt,
+        } as User
       : ({} as User),
   };
 
@@ -209,6 +223,7 @@ export async function emitTaskRequestRejected(
     task: request.task
       ? {
           id: request.task.id,
+          taskType: request.task.taskType,
           name: request.task.name,
           description: request.task.description,
           status: request.task.status,
@@ -216,11 +231,13 @@ export async function emitTaskRequestRejected(
           dueDate: request.task.dueDate,
           assignedToId: request.task.assignedToId,
           createdById: request.task.createdById, // Include createdById
+          completedAt: request.task.completedAt,
+          completedById: request.task.completedById,
           studyId: request.task.studyId,
           projectId: (request.task as any).study?.projectId, // Get projectId from study relation
           createdAt: request.task.createdAt,
           updatedAt: request.task.updatedAt,
-        }
+        } as Task
       : ({} as Task),
     reviewedBy: request.reviewedBy
       ? {
@@ -229,7 +246,11 @@ export async function emitTaskRequestRejected(
           firstName: request.reviewedBy.firstName,
           lastName: request.reviewedBy.lastName,
           role: request.reviewedBy.role,
-        }
+          isActive: request.reviewedBy.isActive,
+          lastLoginAt: request.reviewedBy.lastLoginAt,
+          createdAt: request.reviewedBy.createdAt,
+          updatedAt: request.reviewedBy.updatedAt,
+        } as User
       : ({} as User),
   };
 
@@ -253,17 +274,21 @@ export async function emitTaskAssigned(
   const payload = {
     task: {
       id: task.id,
+      taskType: task.taskType,
       name: task.name,
       description: task.description,
       status: task.status,
       priority: task.priority,
       dueDate: task.dueDate,
+      assignedToId: task.assignedToId,
       studyId: task.studyId,
       projectId: (task as any).study?.projectId,
       createdById: task.createdById,
+      completedAt: task.completedAt,
+      completedById: task.completedById,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
-    },
+    } as Task,
     assignedUserIds,
     createdBy: task.createdBy
       ? {
@@ -272,8 +297,12 @@ export async function emitTaskAssigned(
           firstName: task.createdBy.firstName,
           lastName: task.createdBy.lastName,
           role: task.createdBy.role,
-        }
-      : ({} as User),
+          isActive: task.createdBy.isActive,
+          lastLoginAt: task.createdBy.lastLoginAt,
+          createdAt: task.createdBy.createdAt,
+          updatedAt: task.createdBy.updatedAt,
+        } as User
+      : undefined,
   };
 
   if (io) {

@@ -129,14 +129,18 @@ const saveNotificationsToStorage = (state: NotificationState) => {
     // Convert Date objects to ISO strings for storage
     // Handle both Date objects and ISO strings (from DB)
     const toStore = {
-      notifications: state.notifications.map((n) => ({
-        ...n,
-        timestamp: n.timestamp instanceof Date 
-          ? n.timestamp.toISOString() 
-          : typeof n.timestamp === 'string' 
-          ? n.timestamp 
-          : new Date(n.timestamp).toISOString(),
-      })),
+      notifications: state.notifications.map((n) => {
+        // Type assertion needed because timestamp might be Date at runtime despite being typed as string
+        const timestamp = n.timestamp as any;
+        return {
+          ...n,
+          timestamp: timestamp instanceof Date 
+            ? timestamp.toISOString() 
+            : typeof timestamp === 'string' 
+            ? timestamp 
+            : new Date(timestamp).toISOString(),
+        };
+      }),
       unreadCount: state.unreadCount,
     };
     localStorage.setItem('notifications', JSON.stringify(toStore));
@@ -153,11 +157,15 @@ const notificationSlice = createSlice({
       // Ensure timestamp is a string for Redux serialization
       const notification = {
         ...action.payload,
-        timestamp: typeof action.payload.timestamp === 'string' 
-          ? action.payload.timestamp 
-          : action.payload.timestamp instanceof Date 
-          ? action.payload.timestamp.toISOString() 
-          : new Date(action.payload.timestamp).toISOString(),
+        timestamp: (() => {
+          // Type assertion needed because timestamp might be Date at runtime despite being typed as string
+          const timestamp = action.payload.timestamp as any;
+          return typeof timestamp === 'string'
+            ? timestamp
+            : timestamp instanceof Date
+            ? timestamp.toISOString()
+            : new Date(timestamp).toISOString();
+        })(),
       };
 
       // Check if notification already exists (avoid duplicates)

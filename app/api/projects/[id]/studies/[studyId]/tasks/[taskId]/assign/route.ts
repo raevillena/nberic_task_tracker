@@ -5,7 +5,7 @@ import { assignTask, assignTaskToMultiple } from '@/services/taskService';
 import { getAuthenticatedUser, createErrorResponse, getErrorStatusCode } from '../../../../../../../middleware';
 import { sequelize } from '@/lib/db/connection';
 import { emitTaskAssigned } from '@/lib/socket/taskRequestEvents';
-import { createNotification } from '@/services/notificationService';
+import { createAndEmitNotification } from '@/services/notificationService';
 import { Task, User, Study } from '@/lib/db/models';
 
 /**
@@ -71,14 +71,15 @@ export async function POST(
         ],
       }).then(async (reloadedTask) => {
         const taskData = reloadedTask as any;
-        const creatorName = reloadedTask.createdBy
-          ? `${reloadedTask.createdBy.firstName} ${reloadedTask.createdBy.lastName}`
+        // Use taskData to access included relations (createdBy is loaded via include)
+        const creatorName = taskData.createdBy
+          ? `${taskData.createdBy.firstName} ${taskData.createdBy.lastName}`
           : 'A manager';
         
         // Filter out users who already have a notification (e.g., if task was just created with assignedToId)
         // This prevents duplicate notifications when a task is created with multiple researchers
         // The first researcher already got a notification during task creation
-        const usersToNotify = userIds.filter((userId) => {
+        const usersToNotify = userIds.filter((userId: number) => {
           // If this task was just created (within last 5 seconds) and this user is the assignedToId,
           // they already got a notification during creation, so skip them
           const taskAge = Date.now() - new Date(reloadedTask.createdAt).getTime();
@@ -93,14 +94,14 @@ export async function POST(
         // Only notify users who didn't already get a notification during task creation
         if (usersToNotify.length > 0) {
           await Promise.all(
-            usersToNotify.map((userId) =>
-              createNotification(userId, {
+            usersToNotify.map((userId: number) =>
+              createAndEmitNotification(userId, {
                 type: 'task',
                 title: 'New Task Assigned',
                 message: `${creatorName} assigned you to task "${reloadedTask.name}"`,
                 taskId: reloadedTask.id,
                 projectId: taskData?.study?.projectId,
-                studyId: reloadedTask.studyId,
+                studyId: reloadedTask.studyId ?? undefined,
                 senderId: reloadedTask.createdById,
                 senderName: creatorName,
                 actionUrl: taskData?.study?.projectId
@@ -160,17 +161,18 @@ export async function POST(
         
         // Create DB notification for assigned researcher
         const taskData = reloadedTask as any;
-        const creatorName = reloadedTask.createdBy
-          ? `${reloadedTask.createdBy.firstName} ${reloadedTask.createdBy.lastName}`
+        // Use taskData to access included relations (createdBy is loaded via include)
+        const creatorName = taskData.createdBy
+          ? `${taskData.createdBy.firstName} ${taskData.createdBy.lastName}`
           : 'A manager';
         
-        createNotification(assignedToId, {
+        createAndEmitNotification(assignedToId, {
           type: 'task',
           title: 'New Task Assigned',
           message: `${creatorName} assigned you to task "${reloadedTask.name}"`,
           taskId: reloadedTask.id,
           projectId: taskData?.study?.projectId,
-          studyId: reloadedTask.studyId,
+          studyId: reloadedTask.studyId ?? undefined,
           senderId: reloadedTask.createdById,
           senderName: creatorName,
           actionUrl: taskData?.study?.projectId

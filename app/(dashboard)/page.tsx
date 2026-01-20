@@ -5,13 +5,15 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchProjectsThunk } from '@/store/slices/projectSlice';
+import { fetchProjectsThunk, selectAllProjects } from '@/store/slices/projectSlice';
 import Link from 'next/link';
 
 export default function DashboardPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { projects, isLoading } = useAppSelector((state) => state.project);
+  // Use the selector to get projects array from normalized state
+  const projects = useAppSelector(selectAllProjects);
+  const isLoading = useAppSelector((state) => state.project.isLoading);
   const { user } = useAppSelector((state) => state.auth);
 
   useEffect(() => {

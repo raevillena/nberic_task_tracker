@@ -17,7 +17,7 @@ import {
 import { canAccessResource } from '@/lib/rbac/guards';
 import { PermissionError, ValidationError, NotFoundError } from '@/lib/utils/errors';
 import { Message as MessageModel, User, Task, Study, Project, TaskAssignment } from '@/lib/db/models';
-import { createNotification } from '@/services/notificationService';
+import { createNotification } from '@/services/notificationService'; // Keep createNotification here since we emit separately
 import { Op } from 'sequelize';
 
 type TypedSocket = Socket<

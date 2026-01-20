@@ -13,7 +13,7 @@ interface TaskAssignmentAttributes {
   updatedAt: Date;
 }
 
-interface TaskAssignmentCreationAttributes extends Optional<TaskAssignmentAttributes, 'id' | 'assignedById' | 'createdAt' | 'updatedAt'> {}
+interface TaskAssignmentCreationAttributes extends Optional<TaskAssignmentAttributes, 'id' | 'assignedById' | 'assignedAt' | 'createdAt' | 'updatedAt'> {}
 
 export class TaskAssignment extends Model<TaskAssignmentAttributes, TaskAssignmentCreationAttributes> implements TaskAssignmentAttributes {
   declare id: number;

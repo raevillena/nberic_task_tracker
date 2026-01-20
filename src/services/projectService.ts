@@ -87,7 +87,11 @@ export class ProjectService {
       // Combine both assignment methods
       const allAssignedTasks = [...tasksByAssignedTo, ...tasksByAssignment];
       const assignedProjectIds = new Set(
-        allAssignedTasks.map((t) => (t.study as Study)?.projectId).filter(Boolean)
+        allAssignedTasks.map((t) => {
+          // Type assertion needed because Sequelize relations aren't in the model type
+          const taskData = t as any;
+          return taskData.study?.projectId;
+        }).filter(Boolean)
       );
 
       return projects.filter((project) => assignedProjectIds.has(project.id));
@@ -120,7 +124,9 @@ export class ProjectService {
 
     // Researchers can only access projects with assigned tasks
     if (user.role === UserRole.RESEARCHER) {
-      const studyIds = project.studies?.map((s) => s.id) || [];
+      // Type assertion needed because Sequelize relations aren't in the model type
+      const projectData = project as any;
+      const studyIds = projectData.studies?.map((s: any) => s.id) || [];
       if (studyIds.length === 0) {
         throw new PermissionError('You do not have access to this project');
       }
@@ -471,7 +477,11 @@ export async function getUnreadProjectCount(userId: number): Promise<number> {
 
     // Get project IDs from assigned tasks (matching getAllProjects logic exactly)
     const assignedProjectIds = new Set(
-      allAssignedTasks.map((t) => (t.study as Study)?.projectId).filter(Boolean)
+      allAssignedTasks.map((t) => {
+        // Type assertion needed because Sequelize relations aren't in the model type
+        const taskData = t as any;
+        return taskData.study?.projectId;
+      }).filter(Boolean)
     );
 
     // Filter to only projects that would appear in the dashboard (matching getAllProjects)

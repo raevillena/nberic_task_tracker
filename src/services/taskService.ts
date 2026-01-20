@@ -1,8 +1,8 @@
 // Task service - business logic for tasks
 
-import { Transaction, Op } from 'sequelize';
+import { Transaction, Op, QueryTypes } from 'sequelize';
 import { Task, Study, User, Project, TaskRequest, TaskAssignment, TaskRead } from '@/lib/db/models';
-import { createNotification } from './notificationService';
+import { createAndEmitNotification } from './notificationService';
 import { TaskStatus, TaskPriority, UserRole, TaskRequestType, TaskRequestStatus, TaskType } from '@/types/entities';
 import { CreateTaskRequest, UpdateTaskRequest } from '@/types/api';
 import { UserContext } from '@/types/rbac';
@@ -258,9 +258,11 @@ export async function getTaskById(
 
   // Researchers can only access assigned tasks (check both legacy and new assignments)
   if (user.role === UserRole.RESEARCHER) {
+    // Type assertion needed because Sequelize relations aren't in the model type
+    const taskData = task as any;
     const isAssigned = 
       task.assignedToId === user.id ||
-      (task.assignedResearchers && task.assignedResearchers.some((u) => u.id === user.id));
+      (taskData.assignedResearchers && taskData.assignedResearchers.some((u: any) => u.id === user.id));
     
     if (!isAssigned) {
       throw new PermissionError('You do not have access to this task');
@@ -509,10 +511,12 @@ export async function completeTask(
     }
 
     // Check if user is assigned to this task
-    const isAssigned = 
+    // Type assertion needed because Sequelize relations aren't in the model type
+    const taskData = task as any;
+    const isAssigned =
       task.assignedToId === user.id ||
-      (task.assignedResearchers && task.assignedResearchers.some((u) => u.id === user.id));
-
+      (taskData.assignedResearchers && taskData.assignedResearchers.some((u: any) => u.id === user.id));
+    
     if (!isAssigned) {
       throw new PermissionError('You can only complete tasks assigned to you');
     }
@@ -838,9 +842,11 @@ export async function requestTaskCompletion(
   }
 
   // Check if user is assigned to this task
+  // Type assertion needed because Sequelize relations aren't in the model type
+  const taskData = task as any;
   const isAssigned = 
     task.assignedToId === user.id ||
-    (task.assignedResearchers && task.assignedResearchers.some((u) => u.id === user.id));
+    (taskData.assignedResearchers && taskData.assignedResearchers.some((u: any) => u.id === user.id));
 
   if (!isAssigned) {
     throw new PermissionError('You can only request completion for tasks assigned to you');
@@ -902,25 +908,29 @@ export async function requestTaskCompletion(
     });
     // #region agent log
     try {
-      const taskData = reloadedRequest.task as any;
+      // Type assertion needed because Sequelize relations aren't in the model type
+      const requestData = reloadedRequest as any;
+      const taskData = requestData.task;
       fs.appendFileSync(logPath, `[REQUEST-COMPLETION] Request reloaded: task.createdById=${taskData?.createdById}, task.study.projectId=${taskData?.study?.projectId}\n`);
     } catch {}
     // #endregion
     
     // Create notification in database for the manager who created the task
-    if (reloadedRequest.task?.createdById) {
-      const taskData = reloadedRequest.task as any;
-      const requesterName = reloadedRequest.requestedBy
-        ? `${reloadedRequest.requestedBy.firstName} ${reloadedRequest.requestedBy.lastName}`
+    // Type assertion needed because Sequelize relations aren't in the model type
+    const requestData2 = reloadedRequest as any;
+    if (requestData2.task?.createdById) {
+      const taskData = requestData2.task;
+      const requesterName = requestData2.requestedBy
+        ? `${requestData2.requestedBy.firstName} ${requestData2.requestedBy.lastName}`
         : 'A researcher';
       
-      createNotification(reloadedRequest.task.createdById, {
+      createAndEmitNotification(requestData2.task.createdById, {
         type: 'task',
         title: 'New completion request',
-        message: `${requesterName} requested completion for task "${reloadedRequest.task.name}"`,
+        message: `${requesterName} requested completion for task "${requestData2.task.name}"`,
         taskId: reloadedRequest.taskId,
         projectId: taskData?.study?.projectId,
-        studyId: reloadedRequest.task.studyId,
+        studyId: requestData2.task.studyId,
         senderId: reloadedRequest.requestedById,
         senderName: requesterName,
         actionUrl: '/dashboard/requests',
@@ -1011,9 +1021,11 @@ export async function requestTaskReassignment(
   }
 
   // Check if user is assigned to this task
+  // Type assertion needed because Sequelize relations aren't in the model type
+  const taskData2 = task as any;
   const isAssigned = 
     task.assignedToId === user.id ||
-    (task.assignedResearchers && task.assignedResearchers.some((u) => u.id === user.id));
+    (taskData2.assignedResearchers && taskData2.assignedResearchers.some((u: any) => u.id === user.id));
 
   if (!isAssigned) {
     throw new PermissionError('You can only request reassignment for tasks assigned to you');
@@ -1077,19 +1089,21 @@ export async function requestTaskReassignment(
     });
     
     // Create notification in database for the manager who created the task
-    if (reloadedRequest.task?.createdById) {
-      const taskData = reloadedRequest.task as any;
-      const requesterName = reloadedRequest.requestedBy
-        ? `${reloadedRequest.requestedBy.firstName} ${reloadedRequest.requestedBy.lastName}`
+    // Type assertion needed because Sequelize relations aren't in the model type
+    const requestData3 = reloadedRequest as any;
+    if (requestData3.task?.createdById) {
+      const taskData = requestData3.task;
+      const requesterName = requestData3.requestedBy
+        ? `${requestData3.requestedBy.firstName} ${requestData3.requestedBy.lastName}`
         : 'A researcher';
       
-      createNotification(reloadedRequest.task.createdById, {
+      createAndEmitNotification(requestData3.task.createdById, {
         type: 'task',
         title: 'New reassignment request',
-        message: `${requesterName} requested reassignment for task "${reloadedRequest.task.name}"`,
+        message: `${requesterName} requested reassignment for task "${requestData3.task.name}"`,
         taskId: reloadedRequest.taskId,
         projectId: taskData?.study?.projectId,
-        studyId: reloadedRequest.task.studyId,
+        studyId: requestData3.task.studyId,
         senderId: reloadedRequest.requestedById,
         senderName: requesterName,
         actionUrl: '/dashboard/requests',
@@ -1165,7 +1179,9 @@ export async function approveTaskRequest(
     throw new ValidationError('Request has already been processed');
   }
 
-  const task = request.task!;
+  // Type assertion needed because Sequelize relations aren't in the model type
+  const requestData = request as any;
+  const task = requestData.task!;
 
   // Process the request based on type
   if (request.requestType === TaskRequestType.COMPLETION) {
@@ -1585,7 +1601,7 @@ export async function getUnreadTaskCount(userId: number, userRole: UserRole): Pr
 
     const results = await sequelize.query(query, {
       replacements: { userId },
-      type: sequelize.QueryTypes.SELECT,
+      type: QueryTypes.SELECT,
     }) as any[];
 
     const assignedTaskIds = results.map((r: any) => r.task_id || r.taskId).filter(Boolean);

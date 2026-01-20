@@ -35,7 +35,9 @@ export async function POST(
     const path = require('path');
     const logPath = path.join(process.cwd(), '.cursor', 'debug.log');
     try {
-      const taskData = taskRequest.task as any;
+      // Type assertion needed because Sequelize relations aren't in the model type
+      const taskRequestData = taskRequest as any;
+      const taskData = taskRequestData.task;
       fs.appendFileSync(logPath, `[REQUEST-COMPLETION-ROUTE] Request created, about to emit: requestId=${taskRequest.id}, task.createdById=${taskData?.createdById}, task.study.projectId=${taskData?.study?.projectId}\n`);
     } catch {}
     // #endregion

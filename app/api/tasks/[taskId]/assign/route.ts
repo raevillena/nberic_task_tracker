@@ -5,7 +5,7 @@ import { assignTaskToMultiple } from '@/services/taskService';
 import { getAuthenticatedUser, createErrorResponse, getErrorStatusCode } from '../../../middleware';
 import { sequelize } from '@/lib/db/connection';
 import { emitTaskAssigned } from '@/lib/socket/taskRequestEvents';
-import { createNotification } from '@/services/notificationService';
+import { createAndEmitNotification } from '@/services/notificationService';
 import { Task, User, Project, Study } from '@/lib/db/models';
 
 /**
@@ -89,8 +89,10 @@ export async function POST(
           ],
         });
         
-        const creatorName = reloadedTask.createdBy
-          ? `${reloadedTask.createdBy.firstName} ${reloadedTask.createdBy.lastName}`
+        const taskData = reloadedTask as any;
+        // Use taskData to access included relations (createdBy is loaded via include)
+        const creatorName = taskData.createdBy
+          ? `${taskData.createdBy.firstName} ${taskData.createdBy.lastName}`
           : 'A manager';
         
         // Filter out users who already have a notification (e.g., if task was just created with assignedToId)
@@ -105,19 +107,19 @@ export async function POST(
         if (usersToNotify.length > 0) {
           await Promise.all(
             usersToNotify.map((userId: number) =>
-              createNotification(userId, {
+              createAndEmitNotification(userId, {
                 type: 'task',
                 title: 'New Task Assigned',
                 message: `${creatorName} assigned you to task "${reloadedTask.name}"`,
                 taskId: reloadedTask.id,
-                projectId: reloadedTask.projectId || null,
-                studyId: reloadedTask.studyId || null,
+                projectId: reloadedTask.projectId ?? undefined,
+                studyId: reloadedTask.studyId ?? undefined,
                 senderId: reloadedTask.createdById,
                 senderName: creatorName,
                 actionUrl: reloadedTask.projectId
                   ? `/dashboard/projects/${reloadedTask.projectId}/tasks/${reloadedTask.id}`
-                  : reloadedTask.studyId && reloadedTask.study?.project?.id
-                  ? `/dashboard/projects/${reloadedTask.study.project.id}/studies/${reloadedTask.studyId}/tasks/${reloadedTask.id}`
+                  : reloadedTask.studyId && taskData.study?.project?.id
+                  ? `/dashboard/projects/${taskData.study.project.id}/studies/${reloadedTask.studyId}/tasks/${reloadedTask.id}`
                   : `/dashboard/tasks/${reloadedTask.id}`,
                 timestamp: new Date(),
               }).catch((err) => {
@@ -183,24 +185,26 @@ export async function POST(
           ],
         });
         
-        const creatorName = reloadedTask.createdBy
-          ? `${reloadedTask.createdBy.firstName} ${reloadedTask.createdBy.lastName}`
+        const taskData2 = reloadedTask as any;
+        // Use taskData2 to access included relations (createdBy is loaded via include)
+        const creatorName = taskData2.createdBy
+          ? `${taskData2.createdBy.firstName} ${taskData2.createdBy.lastName}`
           : 'A manager';
         
         // Create DB notification for assigned researcher (await completion)
-        await createNotification(assignedToId, {
+        await createAndEmitNotification(assignedToId, {
           type: 'task',
           title: 'New Task Assigned',
           message: `${creatorName} assigned you to task "${reloadedTask.name}"`,
           taskId: reloadedTask.id,
-          projectId: reloadedTask.projectId || null,
-          studyId: reloadedTask.studyId || null,
+          projectId: reloadedTask.projectId ?? undefined,
+          studyId: reloadedTask.studyId ?? undefined,
           senderId: reloadedTask.createdById,
           senderName: creatorName,
           actionUrl: reloadedTask.projectId
             ? `/dashboard/projects/${reloadedTask.projectId}/tasks/${reloadedTask.id}`
-            : reloadedTask.studyId && reloadedTask.study?.project?.id
-            ? `/dashboard/projects/${reloadedTask.study.project.id}/studies/${reloadedTask.studyId}/tasks/${reloadedTask.id}`
+            : reloadedTask.studyId && taskData2.study?.project?.id
+            ? `/dashboard/projects/${taskData2.study.project.id}/studies/${reloadedTask.studyId}/tasks/${reloadedTask.id}`
             : `/dashboard/tasks/${reloadedTask.id}`,
           timestamp: new Date(),
         }).catch((err) => {

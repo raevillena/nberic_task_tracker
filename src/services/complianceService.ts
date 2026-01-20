@@ -141,9 +141,11 @@ export class ComplianceService {
     }
 
     // Researchers can only see flags for their assigned tasks
+    // Type assertion needed because Sequelize relations aren't in the model type
+    const flagData = flag as any;
     if (
       user.role === UserRole.RESEARCHER &&
-      flag.task.assignedToId !== user.id
+      flagData.task?.assignedToId !== user.id
     ) {
       throw new PermissionError(
         'You do not have access to this compliance flag'

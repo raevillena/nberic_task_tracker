@@ -330,11 +330,11 @@ export default function TasksPage() {
 
     // Research tasks require a project and study
     if (taskType === TaskType.RESEARCH) {
-      if (!selectedProjectId || selectedProjectId === '') {
+      if (!selectedProjectId) {
         setFormError('Please select a project (required for research tasks)');
         return;
       }
-      if (!selectedStudyId || selectedStudyId === '') {
+      if (!selectedStudyId) {
         setFormError('Please select a study (required for research tasks)');
         return;
       }
@@ -562,7 +562,7 @@ export default function TasksPage() {
                           {task.assignedResearchers.map((r: any, idx: number) => (
                             <div key={r.id}>
                               {r.firstName} {r.lastName}
-                              {idx < task.assignedResearchers.length - 1 && ', '}
+                              {idx < (task.assignedResearchers?.length ?? 0) - 1 && ', '}
                             </div>
                           ))}
                         </div>

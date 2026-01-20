@@ -626,7 +626,7 @@ export default function StudyDetailPage() {
                             {task.assignedResearchers.map((r: any, idx: number) => (
                               <div key={r.id}>
                                 {r.firstName} {r.lastName}
-                                {idx < task.assignedResearchers.length - 1 && ', '}
+                                {idx < (task.assignedResearchers?.length ?? 0) - 1 && ', '}
                               </div>
                             ))}
                           </div>
@@ -772,13 +772,13 @@ export default function StudyDetailPage() {
                                 setAssignedUserIds([...assignedUserIds, researcher.id]);
                                 // Also update legacy field for backward compatibility
                                 if (!assignedToId) {
-                                  setAssignedToId(researcher.id);
+                                  setAssignedToId(String(researcher.id));
                                 }
                               } else {
                                 setAssignedUserIds(assignedUserIds.filter((id) => id !== researcher.id));
                                 // Update legacy field if it was the removed user
-                                if (assignedToId === researcher.id) {
-                                  setAssignedToId(assignedUserIds.length > 1 ? assignedUserIds[0] : '');
+                                if (assignedToId === String(researcher.id)) {
+                                  setAssignedToId(assignedUserIds.length > 1 ? String(assignedUserIds[0]) : '');
                                 }
                               }
                             }}

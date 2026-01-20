@@ -299,8 +299,8 @@ export function initializeSocketClient(
           title: `New ${requestTypeLabel} request`,
           message: `${requesterName} requested ${requestTypeLabel} for task "${taskName}"`,
           taskId: data.request.taskId,
-          projectId: data.task?.projectId,
-          studyId: data.task?.studyId,
+          projectId: data.task?.projectId ?? undefined,
+          studyId: data.task?.studyId ?? undefined,
           senderId: data.request.requestedById,
           senderName: requesterName,
           timestamp: new Date(data.request.createdAt).toISOString(),
@@ -340,8 +340,8 @@ export function initializeSocketClient(
           title: `${requestTypeLabel} request approved`,
           message: `${reviewerName} approved your ${requestTypeLabel} request for task "${taskName}"`,
           taskId: data.request.taskId,
-          projectId: data.task?.projectId,
-          studyId: data.task?.studyId,
+          projectId: data.task?.projectId ?? undefined,
+          studyId: data.task?.studyId ?? undefined,
           senderId: data.reviewedBy?.id,
           senderName: reviewerName,
           timestamp: new Date(data.request.reviewedAt || data.request.updatedAt).toISOString(),
@@ -381,8 +381,8 @@ export function initializeSocketClient(
           title: `${requestTypeLabel} request rejected`,
           message: `${reviewerName} rejected your ${requestTypeLabel} request for task "${taskName}"`,
           taskId: data.request.taskId,
-          projectId: data.task?.projectId,
-          studyId: data.task?.studyId,
+          projectId: data.task?.projectId ?? undefined,
+          studyId: data.task?.studyId ?? undefined,
           senderId: data.reviewedBy?.id,
           senderName: reviewerName,
           timestamp: new Date(data.request.reviewedAt || data.request.updatedAt).toISOString(),
@@ -471,7 +471,10 @@ export function joinRoom(type: MessageRoomType, id: number) {
     // Queue the join request for when socket connects
     // Use once to avoid memory leaks
     socket.once('connect', () => {
-      socket.emit('room:join', { type, id });
+      // Socket is guaranteed to be non-null here since we checked above
+      if (socket) {
+        socket.emit('room:join', { type, id });
+      }
     });
   }
 }

@@ -111,13 +111,13 @@ export default function Sidebar() {
   useEffect(() => {
     if (user?.role === UserRole.MANAGER) {
       fetchPendingCount();
-      // Refresh count every 30 seconds as a fallback
-      const interval = setInterval(fetchPendingCount, 30000);
+      // Refresh count every 60 seconds as a fallback (socket handles real-time updates)
+      const interval = setInterval(fetchPendingCount, 60000);
       return () => clearInterval(interval);
     } else if (user?.role === UserRole.RESEARCHER) {
       fetchUnreadCounts();
-      // Refresh counts every 30 seconds
-      const interval = setInterval(fetchUnreadCounts, 30000);
+      // Refresh counts every 60 seconds as a fallback (socket handles real-time updates)
+      const interval = setInterval(fetchUnreadCounts, 60000);
       
       // Also refresh when page becomes visible or window regains focus (user navigates back)
       const handleVisibilityChange = () => {

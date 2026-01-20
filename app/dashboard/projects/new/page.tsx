@@ -101,8 +101,14 @@ export default function CreateProjectPage() {
         <div className="flex items-center justify-end space-x-4">
           <Link
             href="/dashboard/projects"
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-            disabled={isSubmitting}
+            className={`px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 ${
+              isSubmitting ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
+            }`}
+            onClick={(e) => {
+              if (isSubmitting) {
+                e.preventDefault();
+              }
+            }}
           >
             Cancel
           </Link>

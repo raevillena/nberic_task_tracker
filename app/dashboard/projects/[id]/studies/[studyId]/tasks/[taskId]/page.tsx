@@ -213,7 +213,7 @@ export default function TaskDetailPage() {
 
     if (updateTaskThunk.fulfilled.match(result)) {
       // If manager changed assignments, update multiple assignments via assign endpoint
-      if (user?.role === UserRole.MANAGER) {
+      if (user?.role === UserRole.MANAGER && task) {
         // Get current assignments to compare
         const currentAssignedIds: number[] = [];
         if (task.assignedToId) {

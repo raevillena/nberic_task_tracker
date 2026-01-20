@@ -87,7 +87,7 @@ export default function StudiesPage() {
     e.preventDefault();
     setFormError(null);
 
-    if (!selectedProjectId || selectedProjectId === '') {
+    if (!selectedProjectId) {
       setFormError('Please select a project');
       return;
     }

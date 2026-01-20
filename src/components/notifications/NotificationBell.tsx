@@ -45,11 +45,13 @@ export function NotificationBell() {
   }, [isOpen, dispatch]);
 
   // Periodic refresh of notifications from DB to keep badge count accurate
+  // This is a fallback for when socket connection fails or user is offline
+  // Socket events handle real-time delivery, polling is just for badge count updates
   useEffect(() => {
-    // Refresh every 30 seconds to keep badge count accurate
+    // Refresh every 60 seconds as fallback (socket handles real-time delivery)
     const interval = setInterval(() => {
       dispatch(fetchNotificationsThunk());
-    }, 30000); // 30 seconds
+    }, 60000); // 60 seconds - reduced from 30 since socket handles real-time
 
     return () => clearInterval(interval);
   }, [dispatch]);

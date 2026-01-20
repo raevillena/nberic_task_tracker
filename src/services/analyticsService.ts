@@ -1,6 +1,6 @@
 // Analytics service - Business logic for analytics metrics
 
-import { Transaction } from 'sequelize';
+import { Transaction, QueryTypes } from 'sequelize';
 import { Task, User, Study, Project, ComplianceFlag } from '@/lib/db/models';
 import { ComplianceFlagStatus } from '@/lib/db/models/complianceFlag';
 import { TaskStatus, TaskPriority, UserRole } from '@/types/entities';
@@ -367,16 +367,6 @@ export class AnalyticsService {
       console.error('[AnalyticsService] Error in getProjectProgress:', error);
       throw error;
     }
-
-    return result.map((row: any) => ({
-      projectId: row.id,
-      projectName: row.name,
-      cachedProgress: parseFloat(row.progress || '0'),
-      calculatedProgress: parseFloat(row.calculatedProgress || '0'),
-      studyCount: parseInt(row.studyCount || '0', 10),
-      totalTasks: parseInt(row.totalTasks || '0', 10),
-      completedTasks: parseInt(row.completedTasks || '0', 10),
-    }));
   }
 
   /**
@@ -457,8 +447,12 @@ export class AnalyticsService {
         const status = row.status || row['Task.status'] || row['tasks.status'];
         const taskCount = parseInt(String(row.taskCount || row['taskCount'] || '0'), 10);
         
-        if (priority && status && (priority in distribution) && (status in distribution[priority])) {
-          distribution[priority as TaskPriority][status as TaskStatus] = taskCount;
+        // Type guard: check if priority is a valid TaskPriority key
+        if (priority && status && Object.values(TaskPriority).includes(priority as TaskPriority)) {
+          const priorityKey = priority as TaskPriority;
+          if (Object.values(TaskStatus).includes(status as TaskStatus)) {
+            distribution[priorityKey][status as TaskStatus] = taskCount;
+          }
         }
       } catch (err) {
         console.error('[AnalyticsService] Error processing priority row:', { row, error: err });
@@ -644,8 +638,8 @@ export class AnalyticsService {
           required: true,
         },
       ],
-      group: [Task.sequelize!.literal('progressRange')],
-      order: [[Task.sequelize!.literal('progressRange'), 'ASC']],
+      group: [Task.sequelize!.literal('progressRange') as any],
+      order: [[Task.sequelize!.literal('progressRange') as any, 'ASC']],
       raw: true,
     });
 
@@ -752,7 +746,7 @@ export class AnalyticsService {
       include: includes,
       group: [],
       raw: true,
-    });
+    }) as any[];
 
     if (result.length === 0) {
       return {
@@ -763,7 +757,7 @@ export class AnalyticsService {
       };
     }
 
-    const row = result[0];
+    const row = result[0] as any;
       // Handle raw:true format - column names might be prefixed
       const totalTasks = parseInt(String(row.totalTasks || row['totalTasks'] || '0'), 10);
       const tasksWithFlags = parseInt(String(row.tasksWithFlags || row['tasksWithFlags'] || '0'), 10);
@@ -1051,11 +1045,11 @@ export class AnalyticsService {
       ],
       group: [
         'study.project.id',
-        Task.sequelize!.literal('period'),
+        Task.sequelize!.literal('period') as any,
       ],
       order: [
         ['study', 'project', 'id', 'ASC'],
-        [Task.sequelize!.literal('period'), 'ASC'],
+        [Task.sequelize!.literal('period') as any, 'ASC'],
       ],
       raw: false,
     });
@@ -1081,7 +1075,7 @@ export class AnalyticsService {
 
     return Array.from(velocityMap.entries()).map(([id, periods]) => ({
       projectId: id,
-      projectName: result.find((r: any) => r.study.project.id === id)?.study.project.name || '',
+      projectName: (result as any[]).find((r: any) => r.study?.project?.id === id)?.study?.project?.name || '',
       velocity: periods,
     }));
   }
@@ -1143,7 +1137,7 @@ export class AnalyticsService {
       `,
       {
         replacements,
-        type: Project.sequelize!.QueryTypes.SELECT,
+        type: QueryTypes.SELECT,
         transaction,
       }
     );
@@ -1224,7 +1218,7 @@ export class AnalyticsService {
       where: whereClause,
       group: ['studyId'],
       raw: true,
-    });
+    }) as any[];
 
     const studyWhereClause: any = studyId ? { id: studyId } : {};
 
@@ -1278,7 +1272,7 @@ export class AnalyticsService {
 
     return studies.map((study: any) => {
       try {
-        const velocity = velocityData.find((v: any) => v.studyId === study.id || v['studyId'] === study.id);
+        const velocity = velocityData.find((v: any) => v.studyId === study.id || v['studyId'] === study.id) as any;
         const totalTasks = parseInt(String(study.totalTasks || study['totalTasks'] || '0'), 10);
         const completedTasks = parseInt(String(study.completedTasks || study['completedTasks'] || '0'), 10);
         const remainingTasks = totalTasks - completedTasks;
@@ -1398,8 +1392,8 @@ export class AnalyticsService {
       ],
       where: whereClause,
       include: includes,
-      group: [ComplianceFlag.sequelize!.literal('period')],
-      order: [[ComplianceFlag.sequelize!.literal('period'), 'ASC']],
+      group: [ComplianceFlag.sequelize!.literal('period') as any],
+      order: [[ComplianceFlag.sequelize!.literal('period') as any, 'ASC']],
       raw: true,
     });
 
@@ -1528,7 +1522,7 @@ export class AnalyticsService {
       include: includes,
       group: [],
       raw: true,
-    });
+    }) as any[];
 
     if (result.length === 0) {
       return {
@@ -1539,7 +1533,7 @@ export class AnalyticsService {
       };
     }
 
-      const row = result[0];
+      const row = result[0] as any;
       try {
         return {
           avgHoursToResolve: parseFloat(String(row.avgHoursToResolve || row['avgHoursToResolve'] || '0')),

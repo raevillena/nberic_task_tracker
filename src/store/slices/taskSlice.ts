@@ -24,6 +24,7 @@ interface TaskState {
   isUpdating: boolean;
   isCompleting: boolean;
   isAssigning: boolean;
+  isDeleting: boolean;
   
   // Error state
   error: string | null;
@@ -39,6 +40,7 @@ const initialState: TaskState = {
   isUpdating: false,
   isCompleting: false,
   isAssigning: false,
+  isDeleting: false,
   error: null,
 };
 
@@ -436,12 +438,15 @@ const taskSlice = createSlice({
           if (!state.ids.includes(task.id)) {
             state.ids.push(task.id);
           }
-          // Update byStudyId mapping
-          if (!state.byStudyId[task.studyId]) {
-            state.byStudyId[task.studyId] = [];
-          }
-          if (!state.byStudyId[task.studyId].includes(task.id)) {
-            state.byStudyId[task.studyId].push(task.id);
+          // Update byStudyId mapping (only for research tasks with studyId)
+          if (task.studyId !== null && task.studyId !== undefined) {
+            const studyId = task.studyId;
+            if (!state.byStudyId[studyId]) {
+              state.byStudyId[studyId] = [];
+            }
+            if (!state.byStudyId[studyId].includes(task.id)) {
+              state.byStudyId[studyId].push(task.id);
+            }
           }
         });
         

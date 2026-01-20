@@ -10,6 +10,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'NBERIC Task Tracker',
   description: 'Task tracking system for projects, studies, and tasks',
+  icons: {
+    icon: '/ntt.ico',
+  },
 };
 
 export default function RootLayout({

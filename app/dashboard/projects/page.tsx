@@ -5,21 +5,31 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchProjectsThunk, selectAllProjects, deleteProjectThunk } from '@/store/slices/projectSlice';
+import { 
+  fetchProjectsThunk, 
+  selectAllProjects, 
+  deleteProjectThunk,
+  selectProjectIsLoading,
+} from '@/store/slices/projectSlice';
 import { UserRole } from '@/types/entities';
 import Link from 'next/link';
+import { apiRequest } from '@/lib/utils/api';
 
 export default function ProjectsPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const projects = useAppSelector(selectAllProjects);
-  const isLoading = useAppSelector((state) => state.project.isLoading);
-  const { user } = useAppSelector((state) => state.auth);
+  const isLoading = useAppSelector(selectProjectIsLoading);
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
-    dispatch(fetchProjectsThunk());
-  }, [dispatch]);
+    // Only fetch projects if user is authenticated
+    // This prevents 401 errors when navigating before auth is initialized
+    if (isAuthenticated && user) {
+      dispatch(fetchProjectsThunk());
+    }
+  }, [dispatch, isAuthenticated, user]);
 
   const handleDelete = async (projectId: number, e: React.MouseEvent) => {
     e.preventDefault();
@@ -44,7 +54,8 @@ export default function ProjectsPage() {
   const handleProjectClick = async (projectId: number) => {
     if (user?.role === UserRole.RESEARCHER) {
       // Mark as read in the background (don't block navigation)
-      fetch(`/api/projects/${projectId}/read`, {
+      // Use apiRequest to automatically include Authorization header
+      apiRequest(`/api/projects/${projectId}/read`, {
         method: 'POST',
         credentials: 'include',
       })

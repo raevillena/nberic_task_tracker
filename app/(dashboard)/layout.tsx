@@ -8,8 +8,6 @@ import { useAppSelector } from '@/store/hooks';
 import { logoutThunk } from '@/store/slices/authSlice';
 import { useAppDispatch } from '@/store/hooks';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
-import { ToastNotifications } from '@/components/notifications/ToastNotifications';
-import { useSocket } from '@/hooks/useSocket';
 
 export default function DashboardLayout({
   children,
@@ -19,9 +17,6 @@ export default function DashboardLayout({
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
-  
-  // Initialize socket connection for real-time notifications
-  useSocket();
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -43,7 +38,11 @@ export default function DashboardLayout({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <h1 className="text-xl font-bold">NBERIC Task Tracker</h1>
+              <img 
+                src="/Home.png" 
+                alt="NBERIC Task Tracker" 
+                className="h-12 w-auto"
+              />
             </div>
             <div className="flex items-center space-x-4">
               <NotificationBell />
@@ -63,7 +62,6 @@ export default function DashboardLayout({
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
-      <ToastNotifications />
     </div>
   );
 }

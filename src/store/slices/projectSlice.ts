@@ -2,6 +2,7 @@
 
 import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
 import { Project } from '@/types/entities';
+import { apiRequest } from '@/lib/utils/api';
 
 /**
  * Normalized state structure for projects
@@ -42,7 +43,8 @@ export const fetchProjectsThunk = createAsyncThunk(
   'project/fetchProjects',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await fetch('/api/projects', {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest('/api/projects', {
         credentials: 'include',
       });
 
@@ -63,7 +65,8 @@ export const fetchProjectByIdThunk = createAsyncThunk(
   'project/fetchProjectById',
   async (projectId: number, { rejectWithValue }) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}`, {
         credentials: 'include',
       });
 
@@ -84,7 +87,8 @@ export const createProjectThunk = createAsyncThunk(
   'project/createProject',
   async (projectData: { name: string; description?: string }, { rejectWithValue }) => {
     try {
-      const response = await fetch('/api/projects', {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -111,7 +115,8 @@ export const updateProjectThunk = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -135,7 +140,8 @@ export const deleteProjectThunk = createAsyncThunk(
   'project/deleteProject',
   async (projectId: number, { rejectWithValue }) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -271,18 +277,52 @@ const selectProjectState = (state: { project: ProjectState }) => state.project;
 // Memoized selectors for normalized state
 export const selectAllProjects = createSelector(
   [selectProjectState],
-  (projectState) => projectState.ids.map((id) => projectState.entities[id])
+  (projectState) => {
+    // Safety check: ensure projectState and required properties exist
+    if (!projectState || !projectState.ids || !projectState.entities) {
+      return [];
+    }
+    return projectState.ids.map((id) => projectState.entities[id]).filter(Boolean);
+  }
 );
 
 export const selectProjectById = (state: { project: ProjectState }, projectId: number): Project | undefined => {
+  // Safety check: ensure state.project and entities exist
+  if (!state?.project?.entities) {
+    return undefined;
+  }
   return state.project.entities[projectId];
 };
 
 export const selectCurrentProject = createSelector(
   [selectProjectState],
   (projectState) => {
-    if (!projectState.currentProjectId) return null;
+    // Safety check: ensure projectState and entities exist
+    if (!projectState || !projectState.entities || !projectState.currentProjectId) {
+      return null;
+    }
     return projectState.entities[projectState.currentProjectId] || null;
   }
+);
+
+// Loading state selectors with safety checks
+export const selectProjectIsLoading = createSelector(
+  [selectProjectState],
+  (projectState) => projectState?.isLoading ?? false
+);
+
+export const selectProjectIsCreating = createSelector(
+  [selectProjectState],
+  (projectState) => projectState?.isCreating ?? false
+);
+
+export const selectProjectIsUpdating = createSelector(
+  [selectProjectState],
+  (projectState) => projectState?.isUpdating ?? false
+);
+
+export const selectProjectIsDeleting = createSelector(
+  [selectProjectState],
+  (projectState) => projectState?.isDeleting ?? false
 );
 

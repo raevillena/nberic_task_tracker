@@ -14,14 +14,15 @@ import { sequelize } from '@/lib/db/connection';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   // Use transaction to ensure task completion and progress update are atomic
   const transaction = await sequelize.transaction();
 
   try {
     const user = await getAuthenticatedUser(request);
-    const taskId = parseInt(params.taskId, 10);
+    const { taskId: taskIdParam } = await params;
+    const taskId = parseInt(taskIdParam, 10);
 
     if (isNaN(taskId)) {
       await transaction.rollback();

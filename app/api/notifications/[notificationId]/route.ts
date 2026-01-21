@@ -10,11 +10,12 @@ import { Notification } from '@/lib/db/models';
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { notificationId: string } }
+  { params }: { params: Promise<{ notificationId: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
-    const notificationId = parseInt(params.notificationId.replace('db-', ''), 10);
+    const { notificationId: notificationIdParam } = await params;
+    const notificationId = parseInt(notificationIdParam.replace('db-', ''), 10);
 
     if (isNaN(notificationId)) {
       return NextResponse.json(

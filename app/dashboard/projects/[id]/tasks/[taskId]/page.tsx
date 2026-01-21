@@ -5,12 +5,18 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchTaskByIdDirectThunk } from '@/store/slices/taskSlice';
+import { 
+  fetchTaskByIdDirectThunk,
+  selectTaskById,
+  selectTaskIsLoading,
+} from '@/store/slices/taskSlice';
+import { selectProjectById } from '@/store/slices/projectSlice';
 import { TaskStatus, TaskPriority, UserRole, TaskType } from '@/types/entities';
 import Link from 'next/link';
 import { TaskChat } from '@/components/tasks/TaskChat';
 import { useNavigationHistory } from '@/hooks/useNavigationHistory';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { apiRequest } from '@/lib/utils/api';
 
 export default function ProjectTaskDetailPage() {
   const params = useParams();
@@ -27,11 +33,11 @@ export default function ProjectTaskDetailPage() {
     `/dashboard/projects/${projectId}`
   );
 
-  const task = useAppSelector((state) =>
-    taskId && !isNaN(taskId) ? state.task.entities[taskId] : undefined
+  const task = useAppSelector((state) => 
+    taskId && !isNaN(taskId) ? selectTaskById(state, taskId) : undefined
   );
   const project = useAppSelector((state) =>
-    projectId && !isNaN(projectId) ? state.project.entities[projectId] : undefined
+    projectId && !isNaN(projectId) ? selectProjectById(state, projectId) : undefined
   );
 
   // Build breadcrumbs
@@ -41,8 +47,8 @@ export default function ProjectTaskDetailPage() {
     { label: task?.name || 'Task', href: '#' }
   ];
 
-  const isLoading = useAppSelector((state) => state.task.isLoading);
-  const error = useAppSelector((state) => state.task.error);
+  const isLoading = useAppSelector(selectTaskIsLoading);
+  const error = useAppSelector((state) => state.task?.error ?? null);
   const { user } = useAppSelector((state) => state.auth);
 
   const [isEditing, setIsEditing] = useState(false);
@@ -111,9 +117,11 @@ export default function ProjectTaskDetailPage() {
 
   // Load researchers when editing (for managers)
   useEffect(() => {
+    // Only fetch if editing, user is manager, we don't have researchers yet, and we're not already loading
     if (isEditing && user?.role === UserRole.MANAGER && researchers.length === 0 && !loadingResearchers) {
       setLoadingResearchers(true);
-      fetch('/api/users/researchers', { credentials: 'include' })
+      // Use apiRequest to automatically include Authorization header
+      apiRequest('/api/users/researchers', { credentials: 'include' })
         .then((res) => res.json())
         .then((data) => {
           if (data.data) {
@@ -127,18 +135,23 @@ export default function ProjectTaskDetailPage() {
           setLoadingResearchers(false);
         });
     }
-  }, [isEditing, user?.role, researchers.length, loadingResearchers]);
+    // Remove researchers.length and loadingResearchers from dependencies to prevent infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, user?.role]);
 
   // Mark task as read when viewed
   useEffect(() => {
     if (task && taskId && !isNaN(taskId) && user) {
       // Mark task as read in the background (don't block UI)
-      fetch(`/api/tasks/${taskId}/read`, {
-        method: 'POST',
-        credentials: 'include',
-      }).catch((error) => {
-        // Silently fail - this is not critical
-        console.error('Failed to mark task as read:', error);
+      // Use apiRequest to automatically include Authorization header
+      import('@/lib/utils/api').then(({ apiRequest }) => {
+        apiRequest(`/api/tasks/${taskId}/read`, {
+          method: 'POST',
+          credentials: 'include',
+        }).catch((error) => {
+          // Silently fail - this is not critical
+          console.error('Failed to mark task as read:', error);
+        });
       });
     }
   }, [task, taskId, user]);
@@ -170,7 +183,9 @@ export default function ProjectTaskDetailPage() {
     }
 
     try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      // Use apiRequest to automatically include Authorization header
+      const { apiRequest } = await import('@/lib/utils/api');
+      const response = await apiRequest(`/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -186,7 +201,9 @@ export default function ProjectTaskDetailPage() {
       // If manager changed assignments, update multiple assignments
       if (user?.role === UserRole.MANAGER && editAssignedUserIds.length > 0) {
         try {
-          await fetch(`/api/tasks/${taskId}/assign`, {
+          // Use apiRequest to automatically include Authorization header
+          const { apiRequest } = await import('@/lib/utils/api');
+          await apiRequest(`/api/tasks/${taskId}/assign`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -214,7 +231,9 @@ export default function ProjectTaskDetailPage() {
 
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      // Use apiRequest to automatically include Authorization header
+      const { apiRequest } = await import('@/lib/utils/api');
+      const response = await apiRequest(`/api/tasks/${taskId}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -235,7 +254,9 @@ export default function ProjectTaskDetailPage() {
 
   const handleComplete = async () => {
     try {
-      const response = await fetch(`/api/tasks/${taskId}/complete`, {
+      // Use apiRequest to automatically include Authorization header
+      const { apiRequest } = await import('@/lib/utils/api');
+      const response = await apiRequest(`/api/tasks/${taskId}/complete`, {
         method: 'POST',
         credentials: 'include',
       });

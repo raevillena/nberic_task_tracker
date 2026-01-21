@@ -18,7 +18,12 @@ export const GET = createRouteHandler(
       );
     }
 
-    const studyId = parseInt(context?.params?.studyId || '0', 10);
+    // Await params if it's a Promise (Next.js 16+)
+    const params = context?.params instanceof Promise 
+      ? await context.params 
+      : context?.params || {};
+    
+    const studyId = parseInt(params.studyId || '0', 10);
     if (!studyId) {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid study ID' },
@@ -48,7 +53,12 @@ export const POST = createRouteHandler(
       );
     }
 
-    const studyId = parseInt(context?.params?.studyId || '0', 10);
+    // Await params if it's a Promise (Next.js 16+)
+    const params = context?.params instanceof Promise 
+      ? await context.params 
+      : context?.params || {};
+    
+    const studyId = parseInt(params.studyId || '0', 10);
     if (!studyId) {
       return NextResponse.json(
         { error: 'Bad Request', message: 'Invalid study ID' },

@@ -8,7 +8,7 @@ import { AuthenticationError, PermissionError, ValidationError, NotFoundError } 
 
 type RouteHandler = (
   req: AuthenticatedRequest,
-  context?: { params: Record<string, string> }
+  context?: { params: Promise<Record<string, string>> | Record<string, string> }
 ) => Promise<NextResponse>;
 
 interface RouteOptions {
@@ -27,21 +27,23 @@ interface RouteOptions {
  * Extract resource ID from URL params based on resource type
  * Maps common param names to resource IDs
  */
-function extractResourceId(
+async function extractResourceId(
   resource: string,
-  params: Record<string, string> | undefined,
+  params: Promise<Record<string, string>> | Record<string, string> | undefined,
   options: RouteOptions['requirePermission']
-): number | undefined {
+): Promise<number | undefined> {
+  // Await params if it's a Promise (Next.js 16+)
+  const resolvedParams = params instanceof Promise ? await params : params;
   // If resourceId is explicitly provided, use it
   if (options?.resourceId) {
     return options.resourceId;
   }
 
-  if (!params) return undefined;
+  if (!resolvedParams) return undefined;
 
   // Try to extract from specified param name
-  if (options?.paramName && params[options.paramName]) {
-    const id = parseInt(params[options.paramName], 10);
+  if (options?.paramName && resolvedParams[options.paramName]) {
+    const id = parseInt(resolvedParams[options.paramName], 10);
     return isNaN(id) ? undefined : id;
   }
 
@@ -54,8 +56,8 @@ function extractResourceId(
 
   const possibleParams = paramMap[resource] || ['id'];
   for (const paramName of possibleParams) {
-    if (params[paramName]) {
-      const id = parseInt(params[paramName], 10);
+    if (resolvedParams[paramName]) {
+      const id = parseInt(resolvedParams[paramName], 10);
       if (!isNaN(id)) return id;
     }
   }
@@ -83,10 +85,15 @@ export function createRouteHandler(
 
       // RBAC Check
       if (options.requirePermission && authenticatedReq.user) {
+        // Await params if it's a Promise (Next.js 16+)
+        const resolvedParams = context?.params instanceof Promise 
+          ? await context.params 
+          : context?.params;
+        
         // Extract resource ID from URL params if needed
-        const resourceId = extractResourceId(
+        const resourceId = await extractResourceId(
           options.requirePermission.resource,
-          context?.params,
+          resolvedParams,
           options.requirePermission
         );
 
@@ -101,8 +108,12 @@ export function createRouteHandler(
         await requirePermission(authenticatedReq.user, rbacOptions);
       }
 
-      // Execute handler
-      return await handler(authenticatedReq, context);
+      // Execute handler - ensure params is resolved if it's a Promise
+      const resolvedContext = context?.params instanceof Promise
+        ? { params: await context.params }
+        : context;
+      
+      return await handler(authenticatedReq, resolvedContext);
     } catch (error) {
       // Error handling
       if (error instanceof AuthenticationError) {

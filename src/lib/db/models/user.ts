@@ -1,4 +1,7 @@
 // User model
+// NOTE: This app uses external API (umans-api.nbericmmsu.com) as the sole provider of users.
+// The local User table is only used as a cache/mapping table for foreign key relationships.
+// All user data comes from the external API via syncUserFromExternalApi() in userService.ts.
 
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../connection';

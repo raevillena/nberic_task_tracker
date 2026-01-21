@@ -10,11 +10,12 @@ import { getAuthenticatedUser, createErrorResponse, getErrorStatusCode } from '.
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; studyId: string; taskId: string } }
+  { params }: { params: Promise<{ id: string; studyId: string; taskId: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
-    const taskId = parseInt(params.taskId, 10);
+    const { taskId: taskIdParam } = await params;
+    const taskId = parseInt(taskIdParam, 10);
 
     if (isNaN(taskId)) {
       return NextResponse.json(
@@ -40,11 +41,12 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; studyId: string; taskId: string } }
+  { params }: { params: Promise<{ id: string; studyId: string; taskId: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
-    const taskId = parseInt(params.taskId, 10);
+    const { taskId: taskIdParam } = await params;
+    const taskId = parseInt(taskIdParam, 10);
 
     if (isNaN(taskId)) {
       return NextResponse.json(

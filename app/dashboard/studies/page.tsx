@@ -5,19 +5,30 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchProjectsThunk, selectAllProjects } from '@/store/slices/projectSlice';
-import { fetchStudiesByProjectThunk, selectAllStudies, createStudyThunk } from '@/store/slices/studySlice';
+import { 
+  fetchProjectsThunk, 
+  selectAllProjects,
+  selectProjectIsLoading,
+} from '@/store/slices/projectSlice';
+import { 
+  fetchStudiesByProjectThunk, 
+  selectAllStudies, 
+  createStudyThunk,
+  selectStudyIsLoading,
+  selectStudyIsCreating,
+} from '@/store/slices/studySlice';
 import { UserRole } from '@/types/entities';
 import Link from 'next/link';
+import { apiRequest } from '@/lib/utils/api';
 
 export default function StudiesPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const projects = useAppSelector(selectAllProjects);
   const studies = useAppSelector(selectAllStudies);
-  const isLoadingProjects = useAppSelector((state) => state.project.isLoading);
-  const isLoadingStudies = useAppSelector((state) => state.study.isLoading);
-  const isCreating = useAppSelector((state) => state.study.isCreating);
+  const isLoadingProjects = useAppSelector(selectProjectIsLoading);
+  const isLoadingStudies = useAppSelector(selectStudyIsLoading);
+  const isCreating = useAppSelector(selectStudyIsCreating);
   const { user } = useAppSelector((state) => state.auth);
   const [loadedProjectIds, setLoadedProjectIds] = useState<Set<number>>(new Set());
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -30,7 +41,8 @@ export default function StudiesPage() {
   const handleStudyClick = async (projectId: number, studyId: number) => {
     if (user?.role === UserRole.RESEARCHER) {
       // Mark as read in the background (don't block navigation)
-      fetch(`/api/projects/${projectId}/studies/${studyId}/read`, {
+      // Use apiRequest to automatically include Authorization header
+      apiRequest(`/api/projects/${projectId}/studies/${studyId}/read`, {
         method: 'POST',
         credentials: 'include',
       })

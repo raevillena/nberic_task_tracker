@@ -47,14 +47,21 @@ export function NotificationBell() {
   // Periodic refresh of notifications from DB to keep badge count accurate
   // This is a fallback for when socket connection fails or user is offline
   // Socket events handle real-time delivery, polling is just for badge count updates
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
+  
   useEffect(() => {
+    // Only poll if user is authenticated
+    if (!isAuthenticated) {
+      return;
+    }
+
     // Refresh every 60 seconds as fallback (socket handles real-time delivery)
     const interval = setInterval(() => {
       dispatch(fetchNotificationsThunk());
     }, 60000); // 60 seconds - reduced from 30 since socket handles real-time
 
     return () => clearInterval(interval);
-  }, [dispatch]);
+  }, [dispatch, isAuthenticated]);
 
   const handleNotificationClick = async (notification: typeof notifications[0]) => {
     if (notification.id.startsWith('db-')) {

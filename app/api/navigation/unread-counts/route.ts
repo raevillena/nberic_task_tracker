@@ -31,26 +31,13 @@ export async function GET(request: NextRequest) {
 
     try {
       [projects, studies, tasks] = await Promise.all([
-        getUnreadProjectCount(user.id).catch((err) => {
-          console.error('[UnreadCounts] Error getting project count:', err);
-          return 0;
-        }),
-        getUnreadStudyCount(user.id).catch((err) => {
-          console.error('[UnreadCounts] Error getting study count:', err);
-          return 0;
-        }),
-        getUnreadTaskCount(user.id, user.role).catch((err) => {
-          console.error('[UnreadCounts] Error getting task count:', err);
-          return 0;
-        }),
+        getUnreadProjectCount(user.id).catch(() => 0),
+        getUnreadStudyCount(user.id).catch(() => 0),
+        getUnreadTaskCount(user.id, user.role).catch(() => 0),
       ]);
     } catch (error) {
-      console.error('[UnreadCounts] Error in Promise.all:', error);
       // Continue with 0 values
     }
-
-    // Debug logging
-    console.log(`[UnreadCounts] User ${user.id} (${user.role}): projects=${projects}, studies=${studies}, tasks=${tasks}`);
 
     return NextResponse.json({
       projects,
@@ -58,10 +45,7 @@ export async function GET(request: NextRequest) {
       tasks,
     });
   } catch (error: any) {
-    console.error('[UnreadCounts] API route error:', error);
-    console.error('[UnreadCounts] Error stack:', error?.stack);
-    console.error('[UnreadCounts] Error message:', error?.message);
-    console.error('[UnreadCounts] Error name:', error?.name);
+    console.error('[UnreadCounts] Error:', error);
     return createErrorResponse(
       error as Error,
       getErrorStatusCode(error as Error)

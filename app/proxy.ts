@@ -1,9 +1,10 @@
-// Next.js middleware for route protection
+// Next.js proxy for route protection (formerly middleware.ts)
+// In Next.js 16, middleware.ts is renamed to proxy.ts and always runs on Node.js runtime
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes (no auth required)
@@ -24,7 +25,7 @@ export function middleware(request: NextRequest) {
 
   // For protected pages, we rely on client-side redirect
   // The actual auth check happens in the route handler or layout
-  // This middleware just allows the request through
+  // This proxy just allows the request through
   if (pathname.startsWith('/dashboard')) {
     // Client-side will handle redirect if not authenticated
     // We don't check token here to avoid security issues
@@ -39,4 +40,3 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };
-

@@ -37,18 +37,40 @@ import {
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 let socket: TypedSocket | null = null;
+let isInitialized = false;
+
+// Track socket offline notification state
+let hasShownSocketOfflineNotification = false;
+let hasShownSocketReconnectedNotification = false;
+let reconnectAttempts = 0;
 
 /**
  * Initialize Socket.IO client and set up event listeners
+ * This function is idempotent - calling it multiple times with the same token won't create duplicate connections
  */
 export function initializeSocketClient(
   token: string,
   dispatch: AppDispatch,
   getState?: () => any
 ): TypedSocket {
-  // Disconnect existing socket if any
-  if (socket?.connected) {
+  // If socket already exists and is connected with the same token, reuse it
+  if (socket?.connected && isInitialized) {
+    // Check if token changed - if so, we need to reconnect
+    const currentToken = (socket as any).auth?.token;
+    if (currentToken === token) {
+      // Same token, socket already connected and initialized - just return existing socket
+      // Event handlers are already set up, so we're good
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[initializeSocketClient] Reusing existing socket connection');
+      }
+      return socket;
+    }
+    // Token changed, disconnect old socket
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[initializeSocketClient] Token changed, reconnecting socket');
+    }
     socket.disconnect();
+    isInitialized = false;
   }
 
   // Create new socket connection
@@ -60,23 +82,103 @@ export function initializeSocketClient(
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionAttempts: 5,
+    timeout: 20000, // 20 seconds timeout
   });
+
+  // Reset notification flags when creating new connection
+  reconnectAttempts = 0;
+  hasShownSocketReconnectedNotification = false;
 
   // Connection event handlers
   socket.on('connect', () => {
     console.log('Socket connected');
     dispatch(setSocketConnected(true));
     dispatch(setSocketError(null));
+    
+    // Show reconnected notification if we were previously offline
+    if (hasShownSocketOfflineNotification && !hasShownSocketReconnectedNotification) {
+      hasShownSocketReconnectedNotification = true;
+      hasShownSocketOfflineNotification = false;
+      dispatch(
+        addNotification({
+          id: `socket-reconnected-${Date.now()}`,
+          type: 'system',
+          title: 'Connection Restored',
+          message: 'Chat service connection restored. Real-time features are now available.',
+          timestamp: new Date().toISOString(),
+          read: false,
+        })
+      );
+    }
+    reconnectAttempts = 0;
   });
 
-  socket.on('disconnect', () => {
-    console.log('Socket disconnected');
+  socket.on('disconnect', (reason) => {
+    console.log('Socket disconnected:', reason);
     dispatch(setSocketConnected(false));
+    
+    // Only show offline notification if it's not a manual disconnect
+    // and if we haven't shown it recently
+    if (reason !== 'io client disconnect' && !hasShownSocketOfflineNotification) {
+      hasShownSocketOfflineNotification = true;
+      hasShownSocketReconnectedNotification = false;
+      dispatch(
+        addNotification({
+          id: `socket-offline-${Date.now()}`,
+          type: 'system',
+          title: 'Connection Lost',
+          message: 'Chat service connection lost. Real-time features are temporarily unavailable. Attempting to reconnect...',
+          timestamp: new Date().toISOString(),
+          read: false,
+        })
+      );
+    }
   });
 
   socket.on('connect_error', (error) => {
     console.error('Socket connection error:', error);
     dispatch(setSocketError(error.message));
+    
+    reconnectAttempts++;
+    
+    // Show offline notification on first connection error
+    if (!hasShownSocketOfflineNotification) {
+      hasShownSocketOfflineNotification = true;
+      hasShownSocketReconnectedNotification = false;
+      dispatch(
+        addNotification({
+          id: `socket-offline-${Date.now()}`,
+          type: 'system',
+          title: 'Chat Service Offline',
+          message: 'Unable to connect to chat service. Some features may be limited. Attempting to reconnect...',
+          timestamp: new Date().toISOString(),
+          read: false,
+        })
+      );
+    }
+  });
+
+  // Handle reconnection attempts exhausted
+  // Note: These are internal Socket.IO events, so we use 'any' type for the socket
+  (socket as any).on('reconnect_attempt', (attemptNumber: number) => {
+    reconnectAttempts = attemptNumber;
+  });
+
+  (socket as any).on('reconnect_failed', () => {
+    console.error('Socket reconnection failed after all attempts');
+    if (hasShownSocketOfflineNotification) {
+      // Update the notification to indicate reconnection failed
+      dispatch(
+        addNotification({
+          id: `socket-offline-failed-${Date.now()}`,
+          type: 'system',
+          title: 'Connection Failed',
+          message: 'Unable to connect to chat service. Please refresh the page or check your connection.',
+          timestamp: new Date().toISOString(),
+          read: false,
+        })
+      );
+    }
   });
 
   // Authentication handlers
@@ -125,7 +227,15 @@ export function initializeSocketClient(
   });
 
   socket.on('message:new', (data) => {
-    console.log('New message received:', data);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[message:new] New message received:', {
+        messageId: data.message.id,
+        roomType: data.message.roomType,
+        roomId: data.message.roomId,
+        senderId: data.message.senderId,
+        content: data.message.content?.substring(0, 50),
+      });
+    }
     const roomKey = `${data.message.roomType}:${data.message.roomId}`;
     
     // Check if message already exists to avoid duplicates
@@ -134,12 +244,26 @@ export function initializeSocketClient(
     const messageExists = existingMessages.some((m: any) => m.id === data.message.id);
     
     if (!messageExists) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[message:new] Adding message to Redux:', {
+          roomKey,
+          messageId: data.message.id,
+          currentMessageCount: existingMessages.length,
+        });
+      }
       dispatch(
         addMessage({
           roomKey,
           message: data.message,
         })
       );
+    } else {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[message:new] Message already exists, skipping:', {
+          roomKey,
+          messageId: data.message.id,
+        });
+      }
     }
     
     // NOTE: Toast notifications are now handled by the 'notification:new' event
@@ -423,9 +547,13 @@ export function initializeSocketClient(
       );
       
       // Also refresh notifications from DB to update the badge count
-      import('@/store/slices/notificationSlice').then(({ fetchNotificationsThunk }) => {
-        dispatch(fetchNotificationsThunk());
-      });
+      // Only if user is still authenticated
+      const state = getState?.();
+      if (state?.auth?.isAuthenticated && state?.auth?.accessToken) {
+        import('@/store/slices/notificationSlice').then(({ fetchNotificationsThunk }) => {
+          dispatch(fetchNotificationsThunk());
+        });
+      }
     }
   });
 
@@ -435,6 +563,7 @@ export function initializeSocketClient(
     dispatch(setSocketError(data.message));
   });
 
+  isInitialized = true;
   return socket;
 }
 
@@ -449,9 +578,14 @@ export function getSocket(): TypedSocket | null {
  * Disconnect socket
  */
 export function disconnectSocket() {
-  if (socket?.connected) {
+  if (socket) {
     socket.disconnect();
     socket = null;
+    isInitialized = false;
+    // Reset notification flags on manual disconnect
+    hasShownSocketOfflineNotification = false;
+    hasShownSocketReconnectedNotification = false;
+    reconnectAttempts = 0;
   }
 }
 

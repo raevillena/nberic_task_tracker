@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import {
   selectNotifications,
@@ -18,10 +18,71 @@ export function ToastNotifications() {
   const router = useRouter();
   const notifications = useAppSelector(selectNotifications);
   const dismissTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const [isMounted, setIsMounted] = useState(false);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
 
-  // Show only unread notifications as toasts (messages and tasks)
+  // Only render after client-side hydration to prevent hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Check socket connection status and listen to connection events
+  useEffect(() => {
+    if (!isMounted) return;
+
+    const checkSocketConnection = () => {
+      import('@/lib/socket/client').then(({ getSocket }) => {
+        const socket = getSocket();
+        setIsSocketConnected(socket?.connected ?? false);
+      });
+    };
+
+    // Check immediately
+    checkSocketConnection();
+
+    let cleanupSocketListeners: (() => void) | null = null;
+
+    // Listen to socket connection events for real-time updates
+    import('@/lib/socket/client').then(({ getSocket }) => {
+      const socket = getSocket();
+      if (!socket) return;
+
+      const handleConnect = () => setIsSocketConnected(true);
+      const handleDisconnect = () => setIsSocketConnected(false);
+
+      socket.on('connect', handleConnect);
+      socket.on('disconnect', handleDisconnect);
+
+      cleanupSocketListeners = () => {
+        socket.off('connect', handleConnect);
+        socket.off('disconnect', handleDisconnect);
+      };
+    });
+
+    // Fallback: Check periodically to catch connection changes (in case events are missed)
+    const interval = setInterval(checkSocketConnection, 2000);
+
+    return () => {
+      clearInterval(interval);
+      if (cleanupSocketListeners) {
+        cleanupSocketListeners();
+      }
+    };
+  }, [isMounted]);
+
+  // Show only unread notifications as toasts
+  // Only show system notifications when socket is not connected (before login/after logout)
+  // Show all notification types (message, task, system) when socket is connected (after login)
   const unreadToasts = notifications
-    .filter((n) => !n.read && (n.type === 'message' || n.type === 'task'))
+    .filter((n) => {
+      if (n.read) return false;
+      // If socket is not connected, only show system notifications
+      if (!isSocketConnected) {
+        return n.type === 'system';
+      }
+      // If socket is connected, show all notification types
+      return n.type === 'message' || n.type === 'task' || n.type === 'system';
+    })
     .slice(0, 3); // Show max 3 toasts at once
 
   // Auto-dismiss toasts after 5 seconds
@@ -70,12 +131,24 @@ export function ToastNotifications() {
   }, [unreadToasts, dispatch]);
 
   const handleToastClick = (notification: typeof notifications[0]) => {
+    // System notifications (like session expired) don't need navigation
+    if (notification.type === 'system') {
+      // Just mark as read
+      dispatch(markAsRead(notification.id));
+      return;
+    }
+
     if (notification.id.startsWith('db-')) {
       // DB notification: mark as read in DB, then refresh from DB
-      dispatch(markNotificationAsReadThunk(notification.id)).then(() => {
-        // Refresh notifications from DB to get accurate badge count
-        dispatch(fetchNotificationsThunk());
-      });
+      dispatch(markNotificationAsReadThunk(notification.id))
+        .then(() => {
+          // Refresh notifications from DB to get accurate badge count
+          dispatch(fetchNotificationsThunk());
+        })
+        .catch((error) => {
+          // Log error but don't block navigation
+          console.error('Failed to mark notification as read:', error);
+        });
     } else {
       // Non-DB notification: just mark as read in Redux
       dispatch(markAsRead(notification.id));
@@ -97,15 +170,25 @@ export function ToastNotifications() {
   const handleDismiss = (notificationId: string) => {
     if (notificationId.startsWith('db-')) {
       // DB notification: mark as read in DB, then refresh from DB
-      dispatch(markNotificationAsReadThunk(notificationId)).then(() => {
-        // Refresh notifications from DB to get accurate badge count
-        dispatch(fetchNotificationsThunk());
-      });
+      dispatch(markNotificationAsReadThunk(notificationId))
+        .then(() => {
+          // Refresh notifications from DB to get accurate badge count
+          dispatch(fetchNotificationsThunk());
+        })
+        .catch((error) => {
+          // Log error but don't block dismissal
+          console.error('Failed to mark notification as read:', error);
+        });
     } else {
       // Non-DB notification: just mark as read in Redux
       dispatch(markAsRead(notificationId));
     }
   };
+
+  // Don't render until after client-side hydration
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <div className="fixed bottom-4 right-4 z-50 space-y-2">

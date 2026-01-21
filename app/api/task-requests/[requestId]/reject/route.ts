@@ -12,11 +12,12 @@ import { emitTaskRequestRejected } from '@/lib/socket/taskRequestEvents';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { requestId: string } }
+  { params }: { params: Promise<{ requestId: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
-    const requestId = parseInt(params.requestId, 10);
+    const { requestId: requestIdParam } = await params;
+    const requestId = parseInt(requestIdParam, 10);
 
     if (isNaN(requestId)) {
       return NextResponse.json(

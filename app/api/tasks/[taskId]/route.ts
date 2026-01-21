@@ -12,11 +12,12 @@ import { UpdateTaskRequest } from '@/types/api';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
-    const taskId = parseInt(params.taskId, 10);
+    const { taskId: taskIdParam } = await params;
+    const taskId = parseInt(taskIdParam, 10);
 
     if (isNaN(taskId)) {
       return NextResponse.json(
@@ -44,11 +45,12 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
-    const taskId = parseInt(params.taskId, 10);
+    const { taskId: taskIdParam } = await params;
+    const taskId = parseInt(taskIdParam, 10);
 
     if (isNaN(taskId)) {
       return NextResponse.json(
@@ -77,11 +79,12 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { taskId: string } }
+  { params }: { params: Promise<{ taskId: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
-    const taskId = parseInt(params.taskId, 10);
+    const { taskId: taskIdParam } = await params;
+    const taskId = parseInt(taskIdParam, 10);
 
     if (isNaN(taskId)) {
       return NextResponse.json(

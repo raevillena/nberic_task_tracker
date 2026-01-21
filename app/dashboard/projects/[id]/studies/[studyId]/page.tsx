@@ -5,14 +5,32 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchStudyByIdThunk, updateStudyThunk, deleteStudyThunk } from '@/store/slices/studySlice';
-import { fetchTasksByStudyThunk, selectTasksByStudyId, createTaskThunk } from '@/store/slices/taskSlice';
-import { fetchProjectByIdThunk } from '@/store/slices/projectSlice';
+import { 
+  fetchStudyByIdThunk, 
+  updateStudyThunk, 
+  deleteStudyThunk,
+  selectStudyById,
+  selectStudyIsLoading,
+  selectStudyIsUpdating,
+  selectStudyIsDeleting,
+} from '@/store/slices/studySlice';
+import { 
+  fetchTasksByStudyThunk, 
+  selectTasksByStudyId, 
+  createTaskThunk,
+  selectTaskIsLoading,
+  selectTaskIsCreating,
+} from '@/store/slices/taskSlice';
+import { 
+  fetchProjectByIdThunk,
+  selectProjectById,
+} from '@/store/slices/projectSlice';
 import { addNotification } from '@/store/slices/notificationSlice';
 import { TaskStatus, TaskPriority, UserRole } from '@/types/entities';
 import Link from 'next/link';
 import { useNavigationHistory } from '@/hooks/useNavigationHistory';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { apiRequest } from '@/lib/utils/api';
 
 export default function StudyDetailPage() {
   const params = useParams();
@@ -30,10 +48,10 @@ export default function StudyDetailPage() {
   );
 
   const study = useAppSelector((state) =>
-    studyId && !isNaN(studyId) ? state.study.entities[studyId] : undefined
+    studyId && !isNaN(studyId) ? selectStudyById(state, studyId) : undefined
   );
   const project = useAppSelector((state) =>
-    projectId && !isNaN(projectId) ? state.project.entities[projectId] : undefined
+    projectId && !isNaN(projectId) ? selectProjectById(state, projectId) : undefined
   );
 
   // Build breadcrumbs based on where user came from
@@ -60,15 +78,15 @@ export default function StudyDetailPage() {
     
     return items;
   })();
-  const isLoading = useAppSelector((state) => state.study.isLoading);
-  const isUpdating = useAppSelector((state) => state.study.isUpdating);
-  const isDeleting = useAppSelector((state) => state.study.isDeleting);
-  const error = useAppSelector((state) => state.study.error);
+  const isLoading = useAppSelector(selectStudyIsLoading);
+  const isUpdating = useAppSelector(selectStudyIsUpdating);
+  const isDeleting = useAppSelector(selectStudyIsDeleting);
+  const error = useAppSelector((state) => state.study?.error ?? null);
   const tasks = useAppSelector((state) =>
     studyId && !isNaN(studyId) ? selectTasksByStudyId(state, studyId) : []
   );
-  const isLoadingTasks = useAppSelector((state) => state.task.isLoading);
-  const isCreatingTask = useAppSelector((state) => state.task.isCreating);
+  const isLoadingTasks = useAppSelector(selectTaskIsLoading);
+  const isCreatingTask = useAppSelector(selectTaskIsCreating);
   const { user } = useAppSelector((state) => state.auth);
 
   const [isEditing, setIsEditing] = useState(false);
@@ -119,7 +137,8 @@ export default function StudyDetailPage() {
   useEffect(() => {
     if (study && studyId && !isNaN(studyId) && projectId && !isNaN(projectId) && user?.role === UserRole.RESEARCHER) {
       // Mark study as read in the background (don't block UI)
-      fetch(`/api/projects/${projectId}/studies/${studyId}/read`, {
+      // Use apiRequest to automatically include Authorization header
+      apiRequest(`/api/projects/${projectId}/studies/${studyId}/read`, {
         method: 'POST',
         credentials: 'include',
       }).catch((error) => {
@@ -131,23 +150,29 @@ export default function StudyDetailPage() {
 
   // Fetch researchers when modal opens
   useEffect(() => {
+    // Only fetch if modal is open, we don't have researchers yet, and we're not already loading
     if (showCreateTaskModal && researchers.length === 0 && !loadingResearchers) {
       setLoadingResearchers(true);
-      fetch('/api/users/researchers', { credentials: 'include' })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.data) {
-            setResearchers(data.data);
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to fetch researchers:', err);
-        })
-        .finally(() => {
-          setLoadingResearchers(false);
-        });
+      // Use apiRequest to automatically include Authorization header
+      import('@/lib/utils/api').then(({ apiRequest }) => {
+        apiRequest('/api/users/researchers', { credentials: 'include' })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.data) {
+              setResearchers(data.data);
+            }
+          })
+          .catch((err) => {
+            console.error('Failed to fetch researchers:', err);
+          })
+          .finally(() => {
+            setLoadingResearchers(false);
+          });
+      });
     }
-  }, [showCreateTaskModal, researchers.length, loadingResearchers]);
+    // Remove researchers.length and loadingResearchers from dependencies to prevent infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCreateTaskModal]);
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,7 +248,8 @@ export default function StudyDetailPage() {
       // Assign to multiple researchers if selected
       if (assignedUserIds.length > 0 && task && task.id) {
         try {
-          await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${task.id}/assign`, {
+          // Use apiRequest to automatically include Authorization header
+          await apiRequest(`/api/projects/${projectId}/studies/${studyId}/tasks/${task.id}/assign`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',

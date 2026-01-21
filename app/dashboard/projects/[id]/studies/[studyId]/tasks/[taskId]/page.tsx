@@ -5,12 +5,21 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchTaskByIdThunk, updateTaskThunk, deleteTaskThunk } from '@/store/slices/taskSlice';
+import { 
+  fetchTaskByIdThunk, 
+  updateTaskThunk, 
+  deleteTaskThunk,
+  selectTaskById,
+  selectTaskIsLoading,
+  selectTaskIsUpdating,
+  selectTaskIsDeleting,
+} from '@/store/slices/taskSlice';
 import { TaskStatus, TaskPriority, UserRole } from '@/types/entities';
 import Link from 'next/link';
 import { TaskChat } from '@/components/tasks/TaskChat';
 import { useNavigationHistory } from '@/hooks/useNavigationHistory';
 import { Breadcrumbs } from '@/components/Breadcrumbs';
+import { apiRequest } from '@/lib/utils/api';
 
 export default function TaskDetailPage() {
   const params = useParams();
@@ -29,7 +38,7 @@ export default function TaskDetailPage() {
   );
 
   const task = useAppSelector((state) =>
-    taskId && !isNaN(taskId) ? state.task.entities[taskId] : undefined
+    taskId && !isNaN(taskId) ? selectTaskById(state, taskId) : undefined
   );
 
   // Build breadcrumbs based on where user came from
@@ -57,10 +66,10 @@ export default function TaskDetailPage() {
     
     return items;
   })();
-  const isLoading = useAppSelector((state) => state.task.isLoading);
-  const isUpdating = useAppSelector((state) => state.task.isUpdating);
-  const isDeleting = useAppSelector((state) => state.task.isDeleting);
-  const error = useAppSelector((state) => state.task.error);
+  const isLoading = useAppSelector(selectTaskIsLoading);
+  const isUpdating = useAppSelector(selectTaskIsUpdating);
+  const isDeleting = useAppSelector(selectTaskIsDeleting);
+  const error = useAppSelector((state) => state.task?.error ?? null);
   const { user } = useAppSelector((state) => state.auth);
 
   const [isEditing, setIsEditing] = useState(false);
@@ -133,29 +142,36 @@ export default function TaskDetailPage() {
 
   // Load researchers when editing (for managers)
   useEffect(() => {
+    // Only fetch if editing, user is manager, we don't have researchers yet, and we're not already loading
     if (isEditing && user?.role === UserRole.MANAGER && researchers.length === 0 && !loadingResearchers) {
       setLoadingResearchers(true);
-      fetch('/api/users/researchers', { credentials: 'include' })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.data) {
-            setResearchers(data.data);
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to fetch researchers:', err);
-        })
-        .finally(() => {
-          setLoadingResearchers(false);
-        });
+      // Use apiRequest to automatically include Authorization header
+      import('@/lib/utils/api').then(({ apiRequest }) => {
+        apiRequest('/api/users/researchers', { credentials: 'include' })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.data) {
+              setResearchers(data.data);
+            }
+          })
+          .catch((err) => {
+            console.error('Failed to fetch researchers:', err);
+          })
+          .finally(() => {
+            setLoadingResearchers(false);
+          });
+      });
     }
-  }, [isEditing, user?.role, researchers.length, loadingResearchers]);
+    // Remove researchers.length and loadingResearchers from dependencies to prevent infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, user?.role]);
 
   // Mark task as read when viewed
   useEffect(() => {
     if (task && taskId && !isNaN(taskId) && user) {
       // Mark task as read in the background (don't block UI)
-      fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/read`, {
+      // Use apiRequest to automatically include Authorization header
+      apiRequest(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/read`, {
         method: 'POST',
         credentials: 'include',
       }).catch((error) => {
@@ -237,7 +253,8 @@ export default function TaskDetailPage() {
           if (editAssignedUserIds.length > 0) {
             // Update assignments via assign endpoint
             try {
-              await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/assign`, {
+              // Use apiRequest to automatically include Authorization header
+              await apiRequest(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/assign`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -285,7 +302,8 @@ export default function TaskDetailPage() {
 
   const handleComplete = async () => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/complete`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/complete`, {
         method: 'POST',
         credentials: 'include',
       });
@@ -304,8 +322,10 @@ export default function TaskDetailPage() {
 
   // Load researchers for reassignment dialog
   useEffect(() => {
+    // Only fetch if dialog is open and we don't have researchers yet
     if (showReassignDialog && researchers.length === 0) {
-      fetch('/api/users/researchers', { credentials: 'include' })
+      // Use apiRequest to automatically include Authorization header
+      apiRequest('/api/users/researchers', { credentials: 'include' })
         .then((res) => res.json())
         .then((data) => {
           if (data.data) {
@@ -317,13 +337,16 @@ export default function TaskDetailPage() {
           console.error('Failed to fetch researchers:', err);
         });
     }
-  }, [showReassignDialog, researchers.length, user?.id]);
+    // Remove researchers.length from dependencies to prevent infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showReassignDialog, user?.id]);
 
 
   const handleRequestCompletion = async () => {
     setIsRequesting(true);
     try {
-      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/request-completion`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/request-completion`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -353,7 +376,8 @@ export default function TaskDetailPage() {
 
     setIsRequesting(true);
     try {
-      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/request-reassignment`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/request-reassignment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -711,12 +735,16 @@ export default function TaskDetailPage() {
             <div>
               <dt className="text-sm font-medium text-gray-500">Project</dt>
               <dd className="mt-1 text-sm text-gray-900">
-                <Link
-                  href={`/dashboard/projects/${projectId}`}
-                  className="text-indigo-600 hover:text-indigo-700"
-                >
-                  {task.study?.project?.name || 'Unknown Project'}
-                </Link>
+                {task.study?.project?.name || task.project?.name ? (
+                  <Link
+                    href={`/dashboard/projects/${projectId || task.study?.project?.id || task.project?.id}`}
+                    className="text-indigo-600 hover:text-indigo-700"
+                  >
+                    {task.study?.project?.name || task.project?.name}
+                  </Link>
+                ) : (
+                  <span className="text-gray-400">Unassigned</span>
+                )}
               </dd>
             </div>
             <div>

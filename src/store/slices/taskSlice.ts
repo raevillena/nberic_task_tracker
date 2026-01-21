@@ -2,6 +2,7 @@
 
 import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
 import { Task, TaskStatus } from '@/types/entities';
+import { apiRequest } from '@/lib/utils/api';
 
 /**
  * Normalized state structure for tasks
@@ -49,7 +50,8 @@ export const fetchAllTasksThunk = createAsyncThunk(
   'task/fetchAllTasks',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await fetch('/api/tasks', {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest('/api/tasks', {
         credentials: 'include',
       });
 
@@ -70,7 +72,8 @@ export const fetchTasksByStudyThunk = createAsyncThunk(
   'task/fetchTasksByStudy',
   async (studyId: number, { rejectWithValue }) => {
     try {
-      const response = await fetch(`/api/studies/${studyId}/tasks`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/studies/${studyId}/tasks`, {
         credentials: 'include',
       });
 
@@ -94,7 +97,8 @@ export const fetchTaskByIdThunk = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}`, {
         credentials: 'include',
       });
 
@@ -122,7 +126,8 @@ export const fetchTaskByIdDirectThunk = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/tasks/${taskId}`, {
         credentials: 'include',
       });
 
@@ -177,7 +182,8 @@ export const createTaskThunk = createAsyncThunk(
         // Research task - use study-level endpoint
         // Need to get projectId from study - fetch it first
         try {
-          const studyResponse = await fetch(`/api/studies/${studyId}`, {
+          // Use apiRequest to automatically include Authorization header
+          const studyResponse = await apiRequest(`/api/studies/${studyId}`, {
             credentials: 'include',
           });
           if (!studyResponse.ok) {
@@ -196,7 +202,8 @@ export const createTaskThunk = createAsyncThunk(
         return rejectWithValue('Research tasks require a studyId');
       }
 
-      const response = await fetch(url, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -240,7 +247,8 @@ export const updateTaskThunk = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -267,7 +275,8 @@ export const completeTaskThunk = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/complete`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/complete`, {
         method: 'POST',
         credentials: 'include',
       });
@@ -292,7 +301,8 @@ export const requestTaskCompletionThunk = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/request-completion`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/request-completion`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -319,7 +329,8 @@ export const requestTaskReassignmentThunk = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/request-reassignment`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/request-reassignment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -346,7 +357,8 @@ export const assignTaskThunk = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/assign`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -373,7 +385,8 @@ export const deleteTaskThunk = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/studies/${studyId}/tasks/${taskId}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -662,16 +675,30 @@ const selectTaskState = (state: { task: TaskState }) => state.task;
 // Memoized selectors for normalized state
 export const selectAllTasks = createSelector(
   [selectTaskState],
-  (taskState) => taskState.ids.map((id) => taskState.entities[id])
+  (taskState) => {
+    // Safety check: ensure taskState and ids exist
+    if (!taskState || !taskState.ids || !taskState.entities) {
+      return [];
+    }
+    return taskState.ids.map((id) => taskState.entities[id]).filter(Boolean);
+  }
 );
 
 export const selectTaskById = (state: { task: TaskState }, taskId: number): Task | undefined => {
+  // Safety check: ensure state.task and entities exist
+  if (!state?.task?.entities) {
+    return undefined;
+  }
   return state.task.entities[taskId];
 };
 
 export const selectTasksByStudyId = createSelector(
   [selectTaskState, (_state: { task: TaskState }, studyId: number) => studyId],
   (taskState, studyId) => {
+    // Safety check: ensure taskState and required properties exist
+    if (!taskState || !taskState.byStudyId || !taskState.entities) {
+      return [];
+    }
     const taskIds = taskState.byStudyId[studyId] || [];
     return taskIds.map((id) => taskState.entities[id]).filter(Boolean);
   }
@@ -680,8 +707,42 @@ export const selectTasksByStudyId = createSelector(
 export const selectCurrentTask = createSelector(
   [selectTaskState],
   (taskState) => {
-    if (!taskState.currentTaskId) return null;
+    // Safety check: ensure taskState and entities exist
+    if (!taskState || !taskState.entities || !taskState.currentTaskId) {
+      return null;
+    }
     return taskState.entities[taskState.currentTaskId] || null;
   }
+);
+
+// Loading state selectors with safety checks
+export const selectTaskIsLoading = createSelector(
+  [selectTaskState],
+  (taskState) => taskState?.isLoading ?? false
+);
+
+export const selectTaskIsCreating = createSelector(
+  [selectTaskState],
+  (taskState) => taskState?.isCreating ?? false
+);
+
+export const selectTaskIsUpdating = createSelector(
+  [selectTaskState],
+  (taskState) => taskState?.isUpdating ?? false
+);
+
+export const selectTaskIsCompleting = createSelector(
+  [selectTaskState],
+  (taskState) => taskState?.isCompleting ?? false
+);
+
+export const selectTaskIsAssigning = createSelector(
+  [selectTaskState],
+  (taskState) => taskState?.isAssigning ?? false
+);
+
+export const selectTaskIsDeleting = createSelector(
+  [selectTaskState],
+  (taskState) => taskState?.isDeleting ?? false
 );
 

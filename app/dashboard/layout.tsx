@@ -9,7 +9,6 @@ import { logoutThunk } from '@/store/slices/authSlice';
 import { useAppDispatch } from '@/store/hooks';
 import Sidebar from '@/components/Sidebar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
-import { ToastNotifications } from '@/components/notifications/ToastNotifications';
 
 export default function DashboardLayout({
   children,
@@ -42,7 +41,7 @@ export default function DashboardLayout({
         <header className="bg-white shadow-sm sticky top-0 z-30">
           <div className="px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
-              <div className="flex items-center">
+              <div className="flex items-center pl-10 lg:pl-0">
                 <h2 className="text-lg font-semibold text-gray-900">Dashboard</h2>
               </div>
               <div className="flex items-center space-x-4">
@@ -61,11 +60,12 @@ export default function DashboardLayout({
           </div>
         </header>
         {/* Main content */}
-        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-8">
-          {children}
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full max-w-full overflow-x-hidden">
+          <div className="w-full max-w-full">
+            {children}
+          </div>
         </main>
       </div>
-      <ToastNotifications />
     </div>
   );
 }

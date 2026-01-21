@@ -10,13 +10,13 @@ const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads');
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { fileId: string } }
+  { params }: { params: Promise<{ fileId: string }> }
 ) {
   try {
     // Authenticate request
     await authenticateRequest(request);
 
-    const { fileId } = params;
+    const { fileId } = await params;
 
     // Find file by ID (in production, query database)
     // For now, we'll look for files matching the pattern

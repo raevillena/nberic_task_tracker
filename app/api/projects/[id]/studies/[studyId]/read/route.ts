@@ -10,11 +10,12 @@ import { getAuthenticatedUser, createErrorResponse, getErrorStatusCode } from '.
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; studyId: string } }
+  { params }: { params: Promise<{ id: string; studyId: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
-    const studyId = parseInt(params.studyId, 10);
+    const { studyId: studyIdParam } = await params;
+    const studyId = parseInt(studyIdParam, 10);
 
     if (isNaN(studyId)) {
       return NextResponse.json(

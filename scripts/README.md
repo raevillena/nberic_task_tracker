@@ -1,8 +1,48 @@
 # Database Setup Scripts
 
-This directory contains scripts to automate the creation of the MariaDB database, user, and privileges.
+This directory contains scripts to automate the creation of the MariaDB database, user, and privileges, as well as utility scripts for database management.
 
 ## Available Scripts
+
+### Database Truncation
+
+**`truncate-database.ts`** - Truncates all database tables (deletes all data)
+
+⚠️ **WARNING**: This will delete ALL data from all tables! Use with caution - for development/testing only.
+
+**Usage:**
+```bash
+npm run db:truncate
+```
+
+Or directly:
+```bash
+npx ts-node -r tsconfig-paths/register --project tsconfig.server.json scripts/truncate-database.ts
+```
+
+**What it does:**
+- Connects to the database using environment variables from `.env.local` or `.env`
+- Disables foreign key checks temporarily
+- Truncates all tables in the correct order
+- Re-enables foreign key checks
+- Closes the connection
+
+**Tables truncated (in order):**
+1. `task_reads`
+2. `project_reads`
+3. `study_reads`
+4. `notifications`
+5. `task_assignments`
+6. `task_requests`
+7. `compliance_flags`
+8. `messages`
+9. `tasks`
+10. `studies`
+11. `projects`
+12. `token_sessions`
+13. `users`
+
+**Note:** This script uses `TRUNCATE` which is faster than `DELETE` but resets auto-increment counters. Foreign key constraints are temporarily disabled to allow truncation in any order.
 
 ### 1. Interactive PowerShell Script (Windows)
 **File**: `setup-database.ps1`

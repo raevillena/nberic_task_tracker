@@ -4,7 +4,8 @@
 
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { useSocket } from '@/hooks/useSocket';
+// Socket is already initialized globally in providers.tsx (SocketInitializer)
+// No need to import useSocket here - it would cause duplicate connections
 import {
   joinRoom,
   leaveRoom,
@@ -32,7 +33,8 @@ interface TaskChatProps {
 }
 
 export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps) {
-  useSocket(); // Initialize socket connection
+  // Socket is already initialized globally in providers.tsx (SocketInitializer)
+  // No need to call useSocket() here - it would cause duplicate connections
   const dispatch = useAppDispatch();
   const messages = useAppSelector((state) =>
     selectRoomMessages(state, 'task', taskId)
@@ -53,11 +55,21 @@ export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps
   // Join room when component mounts and socket is connected
   useEffect(() => {
     if (socketConnected) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[TaskChat] Joining room:', { type: 'task', id: taskId });
+      }
       joinRoom('task', taskId);
+    } else {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[TaskChat] Socket not connected, cannot join room yet');
+      }
     }
 
     return () => {
       if (socketConnected) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[TaskChat] Leaving room:', { type: 'task', id: taskId });
+        }
         leaveRoom('task', taskId);
       }
     };
@@ -100,7 +112,9 @@ export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/files/upload', {
+      // Use apiRequest to automatically include Authorization header
+      const { apiRequest } = await import('@/lib/utils/api');
+      const response = await apiRequest('/api/files/upload', {
         method: 'POST',
         body: formData,
       });

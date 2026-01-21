@@ -12,6 +12,7 @@ import { Notification } from './notification';
 import { TaskRead } from './taskRead';
 import { ProjectRead } from './projectRead';
 import { StudyRead } from './studyRead';
+import { TokenSession } from './tokenSession';
 
 // User Associations
 User.hasMany(Project, {
@@ -266,5 +267,5 @@ ComplianceFlag.belongsTo(User, {
   as: 'resolvedBy',
 });
 
-export { User, Project, Study, Task, Message, ComplianceFlag, TaskRequest, TaskAssignment, Notification, TaskRead, ProjectRead, StudyRead };
+export { User, Project, Study, Task, Message, ComplianceFlag, TaskRequest, TaskAssignment, Notification, TaskRead, ProjectRead, StudyRead, TokenSession };
 

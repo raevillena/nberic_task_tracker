@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Note: Next.js 16 uses Turbopack by default, but we have custom webpack config
+  // We're using webpack explicitly via --webpack flag in dev scripts
+  // This is needed for database packages (sequelize, mariadb, bcrypt) that require custom webpack handling
+  // Empty turbopack config to silence the warning (we're using webpack instead)
+  turbopack: {},
   webpack: (config, { isServer }) => {
     // Suppress warnings about dynamic requires in sequelize
     config.ignoreWarnings = [

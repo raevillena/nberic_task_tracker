@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useAppSelector } from '@/store/hooks';
 import { UserRole, TaskRequestType, TaskRequestStatus } from '@/types/entities';
 import Link from 'next/link';
+import { apiRequest } from '@/lib/utils/api';
 
 interface TaskRequest {
   id: number;
@@ -77,7 +78,8 @@ export default function RequestsPage() {
   const fetchRequests = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/task-requests', {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest('/api/task-requests', {
         credentials: 'include',
       });
 
@@ -140,7 +142,8 @@ export default function RequestsPage() {
   const handleApprove = async (requestId: number) => {
     setProcessingId(requestId);
     try {
-      const response = await fetch(`/api/task-requests/${requestId}/approve`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/task-requests/${requestId}/approve`, {
         method: 'POST',
         credentials: 'include',
       });
@@ -224,7 +227,8 @@ export default function RequestsPage() {
     setProcessingId(rejectingRequestId);
 
     try {
-      const response = await fetch(`/api/task-requests/${rejectingRequestId}/reject`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/task-requests/${rejectingRequestId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

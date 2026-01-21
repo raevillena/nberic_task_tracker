@@ -2,6 +2,7 @@
 
 import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit';
 import { Study } from '@/types/entities';
+import { apiRequest } from '@/lib/utils/api';
 
 /**
  * Normalized state structure for studies
@@ -45,7 +46,8 @@ export const fetchStudiesByProjectThunk = createAsyncThunk(
   'study/fetchStudiesByProject',
   async (projectId: number, { rejectWithValue }) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/studies`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/studies`, {
         credentials: 'include',
       });
 
@@ -69,7 +71,8 @@ export const fetchStudyByIdThunk = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/studies/${studyId}`, {
         credentials: 'include',
       });
 
@@ -93,7 +96,8 @@ export const createStudyThunk = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/studies`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/studies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -128,7 +132,8 @@ export const updateStudyThunk = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/studies/${studyId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -155,7 +160,8 @@ export const deleteStudyThunk = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
-      const response = await fetch(`/api/projects/${projectId}/studies/${studyId}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/studies/${studyId}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -320,16 +326,30 @@ const selectStudyState = (state: { study: StudyState }) => state.study;
 // Memoized selectors for normalized state
 export const selectAllStudies = createSelector(
   [selectStudyState],
-  (studyState) => studyState.ids.map((id) => studyState.entities[id])
+  (studyState) => {
+    // Safety check: ensure studyState and required properties exist
+    if (!studyState || !studyState.ids || !studyState.entities) {
+      return [];
+    }
+    return studyState.ids.map((id) => studyState.entities[id]).filter(Boolean);
+  }
 );
 
 export const selectStudyById = (state: { study: StudyState }, studyId: number): Study | undefined => {
+  // Safety check: ensure state.study and entities exist
+  if (!state?.study?.entities) {
+    return undefined;
+  }
   return state.study.entities[studyId];
 };
 
 export const selectStudiesByProjectId = createSelector(
   [selectStudyState, (_state: { study: StudyState }, projectId: number) => projectId],
   (studyState, projectId) => {
+    // Safety check: ensure studyState and required properties exist
+    if (!studyState || !studyState.byProjectId || !studyState.entities) {
+      return [];
+    }
     const studyIds = studyState.byProjectId[projectId] || [];
     return studyIds.map((id) => studyState.entities[id]).filter(Boolean);
   }
@@ -338,8 +358,32 @@ export const selectStudiesByProjectId = createSelector(
 export const selectCurrentStudy = createSelector(
   [selectStudyState],
   (studyState) => {
-    if (!studyState.currentStudyId) return null;
+    // Safety check: ensure studyState and entities exist
+    if (!studyState || !studyState.entities || !studyState.currentStudyId) {
+      return null;
+    }
     return studyState.entities[studyState.currentStudyId] || null;
   }
+);
+
+// Loading state selectors with safety checks
+export const selectStudyIsLoading = createSelector(
+  [selectStudyState],
+  (studyState) => studyState?.isLoading ?? false
+);
+
+export const selectStudyIsCreating = createSelector(
+  [selectStudyState],
+  (studyState) => studyState?.isCreating ?? false
+);
+
+export const selectStudyIsUpdating = createSelector(
+  [selectStudyState],
+  (studyState) => studyState?.isUpdating ?? false
+);
+
+export const selectStudyIsDeleting = createSelector(
+  [selectStudyState],
+  (studyState) => studyState?.isDeleting ?? false
 );
 

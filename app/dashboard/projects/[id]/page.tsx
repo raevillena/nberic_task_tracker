@@ -5,8 +5,19 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchProjectByIdThunk, deleteProjectThunk, updateProjectThunk } from '@/store/slices/projectSlice';
-import { fetchStudiesByProjectThunk, selectStudiesByProjectId } from '@/store/slices/studySlice';
+import { 
+  fetchProjectByIdThunk, 
+  deleteProjectThunk, 
+  updateProjectThunk,
+  selectProjectById,
+  selectProjectIsLoading,
+  selectProjectIsUpdating,
+} from '@/store/slices/projectSlice';
+import { 
+  fetchStudiesByProjectThunk, 
+  selectStudiesByProjectId,
+  selectStudyIsLoading,
+} from '@/store/slices/studySlice';
 import { UserRole } from '@/types/entities';
 import Link from 'next/link';
 import { useNavigationHistory } from '@/hooks/useNavigationHistory';
@@ -27,7 +38,7 @@ export default function ProjectDetailPage() {
   );
 
   const project = useAppSelector((state) => 
-    projectId && !isNaN(projectId) ? state.project.entities[projectId] : undefined
+    projectId && !isNaN(projectId) ? selectProjectById(state, projectId) : undefined
   );
 
   // Build breadcrumbs
@@ -35,13 +46,13 @@ export default function ProjectDetailPage() {
     { label: 'Projects', href: '/dashboard/projects' },
     { label: project?.name || 'Project', href: '#' }
   ];
-  const projectLoading = useAppSelector((state) => state.project.isLoading);
-  const projectError = useAppSelector((state) => state.project.error);
+  const projectLoading = useAppSelector(selectProjectIsLoading);
+  const projectError = useAppSelector((state) => state.project?.error ?? null);
   const studies = useAppSelector((state) => 
     projectId && !isNaN(projectId) ? selectStudiesByProjectId(state, projectId) : []
   );
-  const studiesLoading = useAppSelector((state) => state.study.isLoading);
-  const isUpdating = useAppSelector((state) => state.project.isUpdating);
+  const studiesLoading = useAppSelector(selectStudyIsLoading);
+  const isUpdating = useAppSelector(selectProjectIsUpdating);
   const { user } = useAppSelector((state) => state.auth);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -63,12 +74,15 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     if (project && projectId && !isNaN(projectId) && user?.role === UserRole.RESEARCHER) {
       // Mark project as read in the background (don't block UI)
-      fetch(`/api/projects/${projectId}/read`, {
-        method: 'POST',
-        credentials: 'include',
-      }).catch((error) => {
-        // Silently fail - this is not critical
-        console.error('Failed to mark project as read:', error);
+      // Use apiRequest to automatically include Authorization header
+      import('@/lib/utils/api').then(({ apiRequest }) => {
+        apiRequest(`/api/projects/${projectId}/read`, {
+          method: 'POST',
+          credentials: 'include',
+        }).catch((error) => {
+          // Silently fail - this is not critical
+          console.error('Failed to mark project as read:', error);
+        });
       });
     }
   }, [project, projectId, user]);

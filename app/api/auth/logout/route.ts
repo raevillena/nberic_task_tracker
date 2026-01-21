@@ -1,29 +1,20 @@
-// Logout API route
+// Logout API route - uses external authentication API
 
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest } from '@/lib/auth/middleware';
-import { User } from '@/lib/db/models';
+import { externalLogout } from '@/services/externalAuthService';
 
 export async function POST(req: NextRequest) {
   try {
-    // Try to authenticate to get user (optional - logout should work even if token expired)
-    let userId: number | null = null;
-    try {
-      const authenticatedReq = await authenticateRequest(req);
-      if (authenticatedReq.user) {
-        userId = authenticatedReq.user.id;
-      }
-    } catch (error) {
-      // Auth failed, but we still want to clear cookies
-      // This handles cases where token is expired but user wants to logout
-    }
+    // Get refresh token from cookie
+    const refreshToken = req.cookies.get('refreshToken')?.value;
 
-    // If we have a user, increment tokenVersion to invalidate all refresh tokens
-    // This ensures logout invalidates all sessions across devices
-    if (userId) {
-      const user = await User.findByPk(userId);
-      if (user) {
-        await user.update({ tokenVersion: user.tokenVersion + 1 });
+    // Logout from external API if we have a refresh token
+    if (refreshToken) {
+      try {
+        await externalLogout(refreshToken);
+      } catch (error) {
+        // Log error but continue to clear local cookies
+        console.error('External logout error (continuing with local cleanup):', error);
       }
     }
 
@@ -44,6 +35,13 @@ export async function POST(req: NextRequest) {
     // Even if there's an error, clear the cookie
     const response = NextResponse.json({ message: 'Logged out successfully' });
     response.cookies.delete('refreshToken');
+    response.cookies.set('refreshToken', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 0,
+      path: '/',
+    });
     return response;
   }
 }

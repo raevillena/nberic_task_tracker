@@ -8,6 +8,7 @@ import { fetchProjectsThunk } from '@/store/slices/projectSlice';
 import { fetchStudiesByProjectThunk } from '@/store/slices/studySlice';
 import { fetchAllTasksThunk } from '@/store/slices/taskSlice';
 import { UserRole } from '@/types/entities';
+import { apiRequest } from '@/lib/utils/api';
 
 interface TrashProject {
   id: number;
@@ -91,10 +92,11 @@ export default function TrashPage() {
   const fetchAllTrash = async () => {
     try {
       setIsLoading(true);
+      // Use apiRequest to automatically include Authorization header
       const [projectsRes, studiesRes, tasksRes] = await Promise.all([
-        fetch('/api/projects/trash', { credentials: 'include' }),
-        fetch('/api/studies/trash', { credentials: 'include' }),
-        fetch('/api/tasks/trash', { credentials: 'include' }),
+        apiRequest('/api/projects/trash', { credentials: 'include' }),
+        apiRequest('/api/studies/trash', { credentials: 'include' }),
+        apiRequest('/api/tasks/trash', { credentials: 'include' }),
       ]);
 
       if (projectsRes.ok) {
@@ -119,7 +121,8 @@ export default function TrashPage() {
   const handleRestoreProject = async (projectId: number) => {
     try {
       setRestoringId({ type: 'project', id: projectId });
-      const response = await fetch(`/api/projects/${projectId}/restore`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/projects/${projectId}/restore`, {
         method: 'POST',
         credentials: 'include',
       });
@@ -142,7 +145,8 @@ export default function TrashPage() {
   const handleRestoreStudy = async (studyId: number) => {
     try {
       setRestoringId({ type: 'study', id: studyId });
-      const response = await fetch(`/api/studies/${studyId}/restore`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/studies/${studyId}/restore`, {
         method: 'POST',
         credentials: 'include',
       });
@@ -169,7 +173,8 @@ export default function TrashPage() {
   const handleRestoreTask = async (taskId: number) => {
     try {
       setRestoringId({ type: 'task', id: taskId });
-      const response = await fetch(`/api/tasks/${taskId}/restore`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/tasks/${taskId}/restore`, {
         method: 'POST',
         credentials: 'include',
       });

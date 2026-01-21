@@ -5,12 +5,27 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchAllTasksThunk, selectAllTasks, createTaskThunk } from '@/store/slices/taskSlice';
-import { fetchProjectsThunk, selectAllProjects } from '@/store/slices/projectSlice';
-import { fetchStudiesByProjectThunk, selectStudiesByProjectId } from '@/store/slices/studySlice';
+import { 
+  fetchAllTasksThunk, 
+  selectAllTasks, 
+  createTaskThunk,
+  selectTaskIsLoading,
+  selectTaskIsCreating,
+} from '@/store/slices/taskSlice';
+import { 
+  fetchProjectsThunk, 
+  selectAllProjects,
+  selectProjectIsLoading,
+} from '@/store/slices/projectSlice';
+import { 
+  fetchStudiesByProjectThunk, 
+  selectStudiesByProjectId,
+  selectStudyIsLoading,
+} from '@/store/slices/studySlice';
 import { addNotification } from '@/store/slices/notificationSlice';
 import { TaskStatus, TaskPriority, TaskType, User, Study, Task } from '@/types/entities';
 import Link from 'next/link';
+import { TaskCard } from '@/components/tasks/TaskCard';
 
 // Stable empty array to prevent unnecessary rerenders
 const EMPTY_STUDIES: Study[] = [];
@@ -26,10 +41,10 @@ export default function TasksPage() {
   const dispatch = useAppDispatch();
   const tasks = useAppSelector(selectAllTasks);
   const projects = useAppSelector(selectAllProjects);
-  const isLoading = useAppSelector((state) => state.task.isLoading);
-  const isCreating = useAppSelector((state) => state.task.isCreating);
-  const isLoadingProjects = useAppSelector((state) => state.project.isLoading);
-  const isLoadingStudies = useAppSelector((state) => state.study.isLoading);
+  const isLoading = useAppSelector(selectTaskIsLoading);
+  const isCreating = useAppSelector(selectTaskIsCreating);
+  const isLoadingProjects = useAppSelector(selectProjectIsLoading);
+  const isLoadingStudies = useAppSelector(selectStudyIsLoading);
   const { user } = useAppSelector((state) => state.auth);
   
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -66,23 +81,29 @@ export default function TasksPage() {
 
   // Fetch researchers when modal opens
   useEffect(() => {
+    // Only fetch if modal is open, we don't have researchers yet, and we're not already loading
     if (showCreateModal && researchers.length === 0 && !loadingResearchers) {
       setLoadingResearchers(true);
-      fetch('/api/users/researchers', { credentials: 'include' })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.data) {
-            setResearchers(data.data);
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to fetch researchers:', err);
-        })
-        .finally(() => {
-          setLoadingResearchers(false);
-        });
+      // Use apiRequest to automatically include Authorization header
+      import('@/lib/utils/api').then(({ apiRequest }) => {
+        apiRequest('/api/users/researchers', { credentials: 'include' })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.data) {
+              setResearchers(data.data);
+            }
+          })
+          .catch((err) => {
+            console.error('Failed to fetch researchers:', err);
+          })
+          .finally(() => {
+            setLoadingResearchers(false);
+          });
+      });
     }
-  }, [showCreateModal, researchers.length, loadingResearchers]);
+    // Remove researchers.length and loadingResearchers from dependencies to prevent infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCreateModal]);
 
   // Get studies for selected project
   const availableStudies = useAppSelector((state) =>
@@ -380,7 +401,9 @@ export default function TasksPage() {
             // Standalone admin task or fallback - try general task assignment
             assignUrl = `/api/tasks/${task.id}/assign`;
           }
-          await fetch(assignUrl, {
+          // Use apiRequest to automatically include Authorization header
+          const { apiRequest } = await import('@/lib/utils/api');
+          await apiRequest(assignUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -428,10 +451,10 @@ export default function TasksPage() {
 
   return (
     <div>
-      <div className="mb-6 flex justify-between items-center">
+      <div className="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Tasks</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Tasks</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">
             {user?.role === 'Manager'
               ? 'View and manage all tasks across projects and studies'
               : 'View your assigned tasks'}
@@ -440,7 +463,7 @@ export default function TasksPage() {
         {user?.role === 'Manager' && (
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+            className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors text-sm sm:text-base"
           >
             Create Task
           </button>
@@ -475,131 +498,148 @@ export default function TasksPage() {
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <SortableHeader column="task">Task</SortableHeader>
-                  <SortableHeader column="project">Project / Study</SortableHeader>
-                  <SortableHeader column="assignedTo">Assigned To</SortableHeader>
-                  <SortableHeader column="assignedDate">Assigned Date</SortableHeader>
-                  <SortableHeader column="priority">Priority</SortableHeader>
-                  <SortableHeader column="status">Status</SortableHeader>
-                  <SortableHeader column="dueDate">Due Date</SortableHeader>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {sortedTasks.map((task) => (
-                  <tr
-                    key={task.id}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        {!(task as any).isRead && (
-                          <div className="h-2 w-2 bg-indigo-600 rounded-full flex-shrink-0" title="Unread" />
-                        )}
-                        <Link
-                          href={
-                            task.taskType === TaskType.ADMIN && task.projectId
-                              ? `/dashboard/projects/${task.projectId}/tasks/${task.id}`
-                              : task.taskType === TaskType.ADMIN
-                              ? `/dashboard/tasks/${task.id}`
-                              : task.studyId && task.study?.project?.id
-                              ? `/dashboard/projects/${task.study.project.id}/studies/${task.studyId}/tasks/${task.id}`
-                              : `/dashboard/tasks/${task.id}`
-                          }
-                          onClick={() => {
-                            // Store referrer for back navigation
-                            const taskPath =
+        <>
+          {/* Mobile Card View */}
+          <div className="block lg:hidden space-y-4">
+            {sortedTasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                getAssignedDate={getAssignedDate}
+                formatDate={formatDate}
+                getStatusColor={getStatusColor}
+                getPriorityColor={getPriorityColor}
+              />
+            ))}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden lg:block bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <SortableHeader column="task">Task</SortableHeader>
+                    <SortableHeader column="project">Project / Study</SortableHeader>
+                    <SortableHeader column="assignedTo">Assigned To</SortableHeader>
+                    <SortableHeader column="assignedDate">Assigned Date</SortableHeader>
+                    <SortableHeader column="priority">Priority</SortableHeader>
+                    <SortableHeader column="status">Status</SortableHeader>
+                    <SortableHeader column="dueDate">Due Date</SortableHeader>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {sortedTasks.map((task) => (
+                    <tr
+                      key={task.id}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          {!(task as any).isRead && (
+                            <div className="h-2 w-2 bg-indigo-600 rounded-full flex-shrink-0" title="Unread" />
+                          )}
+                          <Link
+                            href={
                               task.taskType === TaskType.ADMIN && task.projectId
                                 ? `/dashboard/projects/${task.projectId}/tasks/${task.id}`
                                 : task.taskType === TaskType.ADMIN
                                 ? `/dashboard/tasks/${task.id}`
                                 : task.studyId && task.study?.project?.id
                                 ? `/dashboard/projects/${task.study.project.id}/studies/${task.studyId}/tasks/${task.id}`
-                                : `/dashboard/tasks/${task.id}`;
-                            sessionStorage.setItem(`referrer:${taskPath}`, '/dashboard/tasks');
-                          }}
-                          className={`text-sm font-medium hover:text-indigo-900 ${
-                            !(task as any).isRead ? 'text-indigo-700 font-semibold' : 'text-indigo-600'
-                          }`}
-                        >
-                          {task.name}
-                        </Link>
+                                : `/dashboard/tasks/${task.id}`
+                            }
+                            onClick={() => {
+                              // Store referrer for back navigation
+                              const taskPath =
+                                task.taskType === TaskType.ADMIN && task.projectId
+                                  ? `/dashboard/projects/${task.projectId}/tasks/${task.id}`
+                                  : task.taskType === TaskType.ADMIN
+                                  ? `/dashboard/tasks/${task.id}`
+                                  : task.studyId && task.study?.project?.id
+                                  ? `/dashboard/projects/${task.study.project.id}/studies/${task.studyId}/tasks/${task.id}`
+                                  : `/dashboard/tasks/${task.id}`;
+                              sessionStorage.setItem(`referrer:${taskPath}`, '/dashboard/tasks');
+                            }}
+                            className={`text-sm font-medium hover:text-indigo-900 ${
+                              !(task as any).isRead ? 'text-indigo-700 font-semibold' : 'text-indigo-600'
+                            }`}
+                          >
+                            {task.name}
+                          </Link>
+                          <span
+                            className={`px-2 py-0.5 text-xs font-medium rounded ${
+                              task.taskType === TaskType.ADMIN
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}
+                          >
+                            {task.taskType === TaskType.ADMIN ? 'Admin' : 'Research'}
+                          </span>
+                        </div>
+                        {task.description && (
+                          <p className="text-sm text-gray-500 mt-1 line-clamp-1">{task.description}</p>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {task.study?.project?.name || task.project?.name || (task.taskType === TaskType.ADMIN ? '' : 'Unassigned')}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {task.taskType === TaskType.ADMIN
+                            ? 'Admin Task'
+                            : task.study?.name || 'Unknown Study'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {task.assignedTo ? (
+                          <div className="text-sm text-gray-900">
+                            {task.assignedTo.firstName} {task.assignedTo.lastName}
+                          </div>
+                        ) : task.assignedResearchers && task.assignedResearchers.length > 0 ? (
+                          <div className="text-sm text-gray-900">
+                            {task.assignedResearchers.map((r: any, idx: number) => (
+                              <div key={r.id}>
+                                {r.firstName} {r.lastName}
+                                {idx < (task.assignedResearchers?.length ?? 0) - 1 && ', '}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">Unassigned</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(getAssignedDate(task))}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={`px-2 py-0.5 text-xs font-medium rounded ${
-                            task.taskType === TaskType.ADMIN
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}
+                          className={`px-2 py-1 text-xs font-medium rounded border ${getPriorityColor(
+                            task.priority
+                          )}`}
                         >
-                          {task.taskType === TaskType.ADMIN ? 'Admin' : 'Research'}
+                          {task.priority}
                         </span>
-                      </div>
-                      {task.description && (
-                        <p className="text-sm text-gray-500 mt-1 line-clamp-1">{task.description}</p>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {task.study?.project?.name || task.project?.name || 'Unknown Project'}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {task.taskType === TaskType.ADMIN
-                          ? 'Admin Task'
-                          : task.study?.name || 'Unknown Study'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {task.assignedTo ? (
-                        <div className="text-sm text-gray-900">
-                          {task.assignedTo.firstName} {task.assignedTo.lastName}
-                        </div>
-                      ) : task.assignedResearchers && task.assignedResearchers.length > 0 ? (
-                        <div className="text-sm text-gray-900">
-                          {task.assignedResearchers.map((r: any, idx: number) => (
-                            <div key={r.id}>
-                              {r.firstName} {r.lastName}
-                              {idx < (task.assignedResearchers?.length ?? 0) - 1 && ', '}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400">Unassigned</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(getAssignedDate(task))}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 text-xs font-medium rounded border ${getPriorityColor(
-                          task.priority
-                        )}`}
-                      >
-                        {task.priority}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
-                          task.status
-                        )}`}
-                      >
-                        {task.status.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(task.dueDate)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
+                            task.status
+                          )}`}
+                        >
+                          {task.status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(task.dueDate)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Create Task Modal */}

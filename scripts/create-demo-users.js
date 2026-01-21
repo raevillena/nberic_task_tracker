@@ -1,4 +1,7 @@
 // Script to create demo users for quick login
+// DEPRECATED: This script is no longer functional.
+// This app now uses external API (umans-api.nbericmmsu.com) as the sole provider of users.
+// Users are automatically synced to local database on first login via external API.
 // Run with: node scripts/create-demo-users.js
 
 // Load environment variables
@@ -16,13 +19,21 @@ if (fs.existsSync(envPath)) {
   });
 }
 
-// Import after env is loaded
-const { sequelize } = require('../src/lib/db/connection');
-const { User } = require('../src/lib/db/models');
-const { createUser } = require('../src/services/userService');
-const { UserRole } = require('../src/types/entities');
-
 async function createDemoUsers() {
+  console.log('⚠️  DEPRECATED: This script is no longer functional.');
+  console.log('   This app now uses external API (umans-api.nbericmmsu.com) as the sole provider of users.');
+  console.log('   Users are automatically synced to local database on first login via external API.');
+  console.log('   Please use the external API to create and manage users.');
+  process.exit(0);
+  
+  // OLD CODE (kept for reference, but will never execute):
+  /*
+  // Import after env is loaded
+  const { sequelize } = require('../src/lib/db/connection');
+  const { User } = require('../src/lib/db/models');
+  const { createUser } = require('../src/services/userService');
+  const { UserRole } = require('../src/types/entities');
+
   try {
     await sequelize.authenticate();
     console.log('✅ Database connection established');
@@ -66,6 +77,7 @@ async function createDemoUsers() {
   } finally {
     await sequelize.close();
   }
+  */
 }
 
 createDemoUsers();

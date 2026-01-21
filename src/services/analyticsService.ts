@@ -1559,6 +1559,346 @@ export class AnalyticsService {
       throw error;
     }
   }
+
+  /**
+   * Get admin task metrics summary
+   * Provides overview of admin tasks: total, by status, by priority, completion rate
+   */
+  async getAdminTaskMetrics(
+    projectId: number | null,
+    user: UserContext,
+    transaction?: Transaction
+  ) {
+    const whereClause: any = {
+      taskType: 'admin',
+    };
+
+    if (projectId) {
+      whereClause.projectId = projectId;
+    }
+
+    this.applyRbacFilter(whereClause, user);
+
+    // Get task counts by status
+    const statusCounts = await Task.findAll({
+      transaction,
+      attributes: [
+        'status',
+        [Task.sequelize!.fn('COUNT', Task.sequelize!.col('Task.id')), 'count'],
+      ],
+      where: whereClause,
+      group: ['status'],
+      raw: true,
+    });
+
+    // Get task counts by priority
+    const priorityCounts = await Task.findAll({
+      transaction,
+      attributes: [
+        'priority',
+        [Task.sequelize!.fn('COUNT', Task.sequelize!.col('Task.id')), 'count'],
+      ],
+      where: whereClause,
+      group: ['priority'],
+      raw: true,
+    });
+
+    // Get total and completed counts
+    const totalResult = await Task.findAll({
+      transaction,
+      attributes: [
+        [Task.sequelize!.fn('COUNT', Task.sequelize!.col('Task.id')), 'total'],
+        [
+          Task.sequelize!.fn(
+            'SUM',
+            Task.sequelize!.literal(
+              `CASE WHEN status = '${TaskStatus.COMPLETED}' THEN 1 ELSE 0 END`
+            )
+          ),
+          'completed',
+        ],
+      ],
+      where: whereClause,
+      raw: true,
+    });
+
+    const total = parseInt(String(totalResult[0]?.total || '0'), 10);
+    const completed = parseInt(String(totalResult[0]?.completed || '0'), 10);
+    const completionRate = total > 0 ? (completed / total) * 100 : 0;
+
+    // Build status distribution
+    const byStatus: Record<TaskStatus, number> = {} as any;
+    Object.values(TaskStatus).forEach((status) => {
+      byStatus[status] = 0;
+    });
+    statusCounts.forEach((row: any) => {
+      const status = row.status || row['Task.status'];
+      const count = parseInt(String(row.count || row['count'] || '0'), 10);
+      if (status && Object.values(TaskStatus).includes(status as TaskStatus)) {
+        byStatus[status as TaskStatus] = count;
+      }
+    });
+
+    // Build priority distribution
+    const byPriority: Record<TaskPriority, number> = {} as any;
+    Object.values(TaskPriority).forEach((priority) => {
+      byPriority[priority] = 0;
+    });
+    priorityCounts.forEach((row: any) => {
+      const priority = row.priority || row['Task.priority'];
+      const count = parseInt(String(row.count || row['count'] || '0'), 10);
+      if (priority && Object.values(TaskPriority).includes(priority as TaskPriority)) {
+        byPriority[priority as TaskPriority] = count;
+      }
+    });
+
+    return {
+      total,
+      completed,
+      completionRate: Math.round(completionRate * 100) / 100,
+      byStatus,
+      byPriority,
+    };
+  }
+
+  /**
+   * Get admin task completion trends over time
+   */
+  async getAdminTaskCompletionTrends(
+    projectId: number | null,
+    startDate: Date,
+    endDate: Date,
+    period: 'day' | 'week' | 'month',
+    user: UserContext,
+    transaction?: Transaction
+  ) {
+    this.validateDateRange(startDate, endDate);
+
+    const dateFormatMap = {
+      day: '%Y-%m-%d',
+      week: '%Y-%u',
+      month: '%Y-%m',
+    };
+
+    const dateFormat = dateFormatMap[period];
+
+    const whereClause: any = {
+      taskType: 'admin',
+      createdAt: {
+        [Op.between]: [startDate, endDate],
+      },
+    };
+
+    if (projectId) {
+      whereClause.projectId = projectId;
+    }
+
+    this.applyRbacFilter(whereClause, user);
+
+    const result = await Task.findAll({
+      transaction,
+      attributes: [
+        [
+          Task.sequelize!.fn(
+            'DATE_FORMAT',
+            Task.sequelize!.col('Task.created_at'),
+            dateFormat
+          ),
+          'period',
+        ],
+        [Task.sequelize!.fn('COUNT', Task.sequelize!.col('Task.id')), 'total'],
+        [
+          Task.sequelize!.fn(
+            'SUM',
+            Task.sequelize!.literal(
+              `CASE WHEN status = '${TaskStatus.COMPLETED}' THEN 1 ELSE 0 END`
+            )
+          ),
+          'completed',
+        ],
+      ],
+      where: whereClause,
+      group: [Task.sequelize!.literal('period') as any],
+      order: [[Task.sequelize!.literal('period') as any, 'ASC']],
+      raw: true,
+    });
+
+    return result.map((row: any) => ({
+      period: row.period || row['period'],
+      total: parseInt(String(row.total || row['total'] || '0'), 10),
+      completed: parseInt(String(row.completed || row['completed'] || '0'), 10),
+    }));
+  }
+
+  /**
+   * Get admin task assignment metrics
+   * Shows distribution of admin tasks by assigned user
+   */
+  async getAdminTaskAssignmentMetrics(
+    projectId: number | null,
+    user: UserContext,
+    transaction?: Transaction
+  ) {
+    const whereClause: any = {
+      taskType: 'admin',
+    };
+
+    if (projectId) {
+      whereClause.projectId = projectId;
+    }
+
+    this.applyRbacFilter(whereClause, user);
+
+    const result = await Task.findAll({
+      transaction,
+      attributes: [
+        'assignedToId',
+        [Task.sequelize!.fn('COUNT', Task.sequelize!.col('Task.id')), 'totalTasks'],
+        [
+          Task.sequelize!.fn(
+            'SUM',
+            Task.sequelize!.literal(
+              `CASE WHEN status = '${TaskStatus.COMPLETED}' THEN 1 ELSE 0 END`
+            )
+          ),
+          'completedTasks',
+        ],
+        [
+          Task.sequelize!.fn(
+            'AVG',
+            Task.sequelize!.literal(
+              `CASE WHEN status = '${TaskStatus.COMPLETED}' THEN 1.0 ELSE 0.0 END`
+            )
+          ),
+          'completionRate',
+        ],
+      ],
+      where: whereClause,
+      include: [
+        {
+          model: User,
+          as: 'assignedTo',
+          attributes: ['id', 'email', 'firstName', 'lastName'],
+          required: false,
+        },
+      ],
+      group: ['assignedToId'],
+      raw: false,
+    });
+
+    return result.map((row: any) => ({
+      userId: row.assignedToId,
+      user: row.assignedTo
+        ? {
+            id: row.assignedTo.id,
+            email: row.assignedTo.email,
+            name: `${row.assignedTo.firstName || ''} ${row.assignedTo.lastName || ''}`.trim(),
+          }
+        : null,
+      totalTasks: parseInt(String(row.getDataValue?.('totalTasks') || row.totalTasks || '0'), 10),
+      completedTasks: parseInt(
+        String(row.getDataValue?.('completedTasks') || row.completedTasks || '0'),
+        10
+      ),
+      completionRate:
+        Math.round(
+          (parseFloat(String(row.getDataValue?.('completionRate') || row.completionRate || '0')) *
+            10000) /
+            100
+        ) / 100,
+    }));
+  }
+
+  /**
+   * Get overdue admin tasks
+   */
+  async getOverdueAdminTasks(
+    projectId: number | null,
+    user: UserContext,
+    transaction?: Transaction
+  ) {
+    const whereClause: any = {
+      taskType: 'admin',
+      status: {
+        [Op.ne]: TaskStatus.COMPLETED,
+      },
+      dueDate: {
+        [Op.lt]: new Date(),
+      },
+    };
+
+    if (projectId) {
+      whereClause.projectId = projectId;
+    }
+
+    this.applyRbacFilter(whereClause, user);
+
+    const result = await Task.findAll({
+      transaction,
+      attributes: [
+        'id',
+        'name',
+        'priority',
+        'status',
+        'dueDate',
+        'createdAt',
+        [
+          Task.sequelize!.fn(
+            'TIMESTAMPDIFF',
+            Task.sequelize!.literal('DAY'),
+            Task.sequelize!.col('Task.due_date'),
+            Task.sequelize!.fn('NOW')
+          ),
+          'daysOverdue',
+        ],
+      ],
+      where: whereClause,
+      include: [
+        {
+          model: User,
+          as: 'assignedTo',
+          attributes: ['id', 'email', 'firstName', 'lastName'],
+          required: false,
+        },
+        {
+          model: Project,
+          as: 'project',
+          attributes: ['id', 'name'],
+          required: false,
+        },
+      ],
+      order: [
+        ['priority', 'DESC'],
+        [Task.sequelize!.col('Task.due_date'), 'ASC'],
+      ],
+      raw: false,
+    });
+
+    return result.map((row: any) => ({
+      taskId: row.id,
+      taskName: row.name,
+      priority: row.priority,
+      status: row.status,
+      dueDate: row.dueDate,
+      daysOverdue: parseInt(
+        String(row.getDataValue?.('daysOverdue') || row.daysOverdue || '0'),
+        10
+      ),
+      assignedTo: row.assignedTo
+        ? {
+            id: row.assignedTo.id,
+            email: row.assignedTo.email,
+            name: `${row.assignedTo.firstName || ''} ${row.assignedTo.lastName || ''}`.trim(),
+          }
+        : null,
+      project: row.project
+        ? {
+            id: row.project.id,
+            name: row.project.name,
+          }
+        : null,
+    }));
+  }
 }
 
 // Export singleton instance

@@ -11,11 +11,12 @@ import { UpdateStudyRequest } from '@/types/api';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; studyId: string } }
+  { params }: { params: Promise<{ id: string; studyId: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
-    const studyId = parseInt(params.studyId, 10);
+    const { studyId: studyIdParam } = await params;
+    const studyId = parseInt(studyIdParam, 10);
 
     if (isNaN(studyId)) {
       return NextResponse.json(
@@ -42,11 +43,12 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string; studyId: string } }
+  { params }: { params: Promise<{ id: string; studyId: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
-    const studyId = parseInt(params.studyId, 10);
+    const { studyId: studyIdParam } = await params;
+    const studyId = parseInt(studyIdParam, 10);
 
     if (isNaN(studyId)) {
       return NextResponse.json(
@@ -75,11 +77,12 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; studyId: string } }
+  { params }: { params: Promise<{ id: string; studyId: string }> }
 ) {
   try {
     const user = await getAuthenticatedUser(request);
-    const studyId = parseInt(params.studyId, 10);
+    const { studyId: studyIdParam } = await params;
+    const studyId = parseInt(studyIdParam, 10);
 
     if (isNaN(studyId)) {
       return NextResponse.json(

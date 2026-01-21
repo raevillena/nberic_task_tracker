@@ -5,31 +5,23 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { loginThunk } from '@/store/slices/authSlice';
-
-// Demo user credentials
-const DEMO_USERS = {
-  manager: {
-    email: 'manager@demo.com',
-    password: 'demo123',
-    label: 'Manager',
-    description: 'Full access to all features',
-  },
-  researcher: {
-    email: 'researcher@demo.com',
-    password: 'demo123',
-    label: 'Researcher',
-    description: 'Limited to assigned tasks',
-  },
-} as const;
+import { 
+  loginThunk, 
+  selectIsAuthenticated, 
+  selectAuthIsLoading, 
+  selectAuthError 
+} from '@/store/slices/authSlice';
 
 export default function LoginPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { isAuthenticated, isLoading, error } = useAppSelector((state) => state.auth);
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const isLoading = useAppSelector(selectAuthIsLoading);
+  const error = useAppSelector(selectAuthError);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -37,60 +29,63 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    dispatch(loginThunk({ email, password }));
+  // Validate password format
+  const validatePassword = (pwd: string): string | null => {
+    if (pwd.length < 8) {
+      return 'Password must be at least 8 characters long.';
+    }
+    if (!/[A-Z]/.test(pwd)) {
+      return 'Password must contain at least one uppercase letter.';
+    }
+    if (!/[a-z]/.test(pwd)) {
+      return 'Password must contain at least one lowercase letter.';
+    }
+    if (!/[0-9]/.test(pwd)) {
+      return 'Password must contain at least one number.';
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)) {
+      return 'Password must contain at least one special character.';
+    }
+    return null;
   };
 
-  const handleDemoLogin = (role: keyof typeof DEMO_USERS) => {
-    const demoUser = DEMO_USERS[role];
-    setEmail(demoUser.email);
-    setPassword(demoUser.password);
-    // Automatically submit after a brief delay to show the fields being filled
-    setTimeout(() => {
-      dispatch(loginThunk({ email: demoUser.email, password: demoUser.password }));
-    }, 100);
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newPassword = e.target.value;
+    setPassword(newPassword);
+    
+    // Only show validation error if user has started typing
+    if (newPassword.length > 0) {
+      setPasswordError(validatePassword(newPassword));
+    } else {
+      setPasswordError(null);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate password before submitting
+    const validationError = validatePassword(password);
+    if (validationError) {
+      setPasswordError(validationError);
+      return;
+    }
+    
+    setPasswordError(null);
+    dispatch(loginThunk({ email, password }));
   };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50">
       <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold text-center mb-2">NBERIC Task Tracker</h1>
+        <div className="flex flex-col items-center mb-6">
+          <img 
+            src="/Home.png" 
+            alt="NBERIC Task Tracker" 
+            className="h-20 w-auto mb-4"
+          />
+        </div>
         <h2 className="text-xl font-semibold text-center mb-6 text-gray-600">Login</h2>
-        
-        {/* Demo User Section */}
-        <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <p className="text-sm font-medium text-blue-900 mb-3">Quick Demo Login:</p>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => handleDemoLogin('manager')}
-              disabled={isLoading}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors"
-            >
-              <div className="font-semibold">Manager</div>
-              <div className="text-xs opacity-90">Full Access</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDemoLogin('researcher')}
-              disabled={isLoading}
-              className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 transition-colors"
-            >
-              <div className="font-semibold">Researcher</div>
-              <div className="text-xs opacity-90">Limited Access</div>
-            </button>
-          </div>
-        </div>
-
-        <div className="relative mb-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300"></div>
-          </div>
-          <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white text-gray-500">Or sign in with credentials</span>
-          </div>
-        </div>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -115,10 +110,18 @@ export default function LoginPage() {
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={handlePasswordChange}
               required
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 ${
+                passwordError ? 'border-red-300' : 'border-gray-300'
+              }`}
             />
+            {passwordError && (
+              <p className="mt-1 text-sm text-red-600">{passwordError}</p>
+            )}
+            {password.length > 0 && !passwordError && (
+              <p className="mt-1 text-xs text-green-600">Password format is valid</p>
+            )}
           </div>
 
           {error && (
@@ -135,6 +138,19 @@ export default function LoginPage() {
             {isLoading ? 'Logging in...' : 'Login'}
           </button>
         </form>
+        
+        {/* Branding */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <div className="flex items-center justify-center space-x-2">
+            <p className="text-xs text-gray-500">Powered by</p>
+            <img 
+              src="/umans.ico" 
+              alt="MMSU-UMANS" 
+              className="h-4 w-auto"
+            />
+            <span className="text-xs font-semibold text-gray-500">MMSU-UMANS</span>
+          </div>
+        </div>
       </div>
     </div>
   );

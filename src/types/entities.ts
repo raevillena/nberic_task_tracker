@@ -87,6 +87,7 @@ export interface Task {
   assignedResearchers?: User[]; // Many-to-many assignments
   createdBy?: User;
   completedBy?: User;
+  complianceFlags?: ComplianceFlag[]; // Compliance flags for this task
 }
 
 export enum TaskRequestType {
@@ -117,5 +118,37 @@ export interface TaskRequest {
   requestedBy?: User;
   requestedAssignedTo?: User;
   reviewedBy?: User;
+}
+
+export enum ComplianceFlagStatus {
+  OPEN = 'open',
+  RESOLVED = 'resolved',
+  DISMISSED = 'dismissed',
+}
+
+export enum ComplianceFlagSeverity {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+  CRITICAL = 'critical',
+}
+
+export interface ComplianceFlag {
+  id: number;
+  taskId: number;
+  flagType: string; // e.g., 'data_quality', 'protocol_violation', 'missing_documentation'
+  severity: ComplianceFlagSeverity;
+  status: ComplianceFlagStatus;
+  description: string;
+  raisedById: number;
+  resolvedById: number | null;
+  resolvedAt: Date | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  // Relations (optional, loaded via include)
+  task?: Task;
+  raisedBy?: User;
+  resolvedBy?: User;
 }
 

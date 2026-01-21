@@ -2,6 +2,7 @@
 
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { TaskPriority, TaskStatus } from '@/types/entities';
+import { apiRequest } from '@/lib/utils/api';
 
 // Analytics metric types
 export interface ResearcherProductivity {
@@ -134,6 +135,51 @@ export interface ComplianceFlagResolutionTime {
   resolvedCount: number;
 }
 
+// Admin task metrics types
+export interface AdminTaskMetrics {
+  total: number;
+  completed: number;
+  completionRate: number;
+  byStatus: Record<TaskStatus, number>;
+  byPriority: Record<TaskPriority, number>;
+}
+
+export interface AdminTaskCompletionTrend {
+  period: string;
+  total: number;
+  completed: number;
+}
+
+export interface AdminTaskAssignmentMetrics {
+  userId: number | null;
+  user: {
+    id: number;
+    email: string;
+    name: string;
+  } | null;
+  totalTasks: number;
+  completedTasks: number;
+  completionRate: number;
+}
+
+export interface OverdueAdminTask {
+  taskId: number;
+  taskName: string;
+  priority: TaskPriority;
+  status: TaskStatus;
+  dueDate: Date | null;
+  daysOverdue: number;
+  assignedTo: {
+    id: number;
+    email: string;
+    name: string;
+  } | null;
+  project: {
+    id: number;
+    name: string;
+  } | null;
+}
+
 interface AnalyticsState {
   // Researcher productivity
   researcherProductivity: ResearcherProductivity[];
@@ -183,6 +229,23 @@ interface AnalyticsState {
   complianceFlagResolutionTime: ComplianceFlagResolutionTime[];
   complianceFlagResolutionTimeLoading: boolean;
   complianceFlagResolutionTimeError: string | null;
+
+  // Admin task metrics
+  adminTaskMetrics: AdminTaskMetrics | null;
+  adminTaskMetricsLoading: boolean;
+  adminTaskMetricsError: string | null;
+
+  adminTaskCompletionTrends: AdminTaskCompletionTrend[];
+  adminTaskCompletionTrendsLoading: boolean;
+  adminTaskCompletionTrendsError: string | null;
+
+  adminTaskAssignmentMetrics: AdminTaskAssignmentMetrics[];
+  adminTaskAssignmentMetricsLoading: boolean;
+  adminTaskAssignmentMetricsError: string | null;
+
+  overdueAdminTasks: OverdueAdminTask[];
+  overdueAdminTasksLoading: boolean;
+  overdueAdminTasksError: string | null;
 }
 
 const initialState: AnalyticsState = {
@@ -229,6 +292,23 @@ const initialState: AnalyticsState = {
   complianceFlagResolutionTime: [],
   complianceFlagResolutionTimeLoading: false,
   complianceFlagResolutionTimeError: null,
+
+  // Admin task metrics
+  adminTaskMetrics: null,
+  adminTaskMetricsLoading: false,
+  adminTaskMetricsError: null,
+
+  adminTaskCompletionTrends: [],
+  adminTaskCompletionTrendsLoading: false,
+  adminTaskCompletionTrendsError: null,
+
+  adminTaskAssignmentMetrics: [],
+  adminTaskAssignmentMetricsLoading: false,
+  adminTaskAssignmentMetricsError: null,
+
+  overdueAdminTasks: [],
+  overdueAdminTasksLoading: false,
+  overdueAdminTasksError: null,
 };
 
 // Helper function to build query string
@@ -255,7 +335,8 @@ export const fetchResearcherProductivityThunk = createAsyncThunk(
   ) => {
     try {
       const queryString = buildQueryString(params);
-      const response = await fetch(`/api/analytics/productivity?${queryString}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/analytics/productivity?${queryString}`, {
         credentials: 'include',
       });
 
@@ -278,7 +359,8 @@ export const fetchProjectProgressThunk = createAsyncThunk(
   async (projectId: number | null, { rejectWithValue }) => {
     try {
       const queryString = projectId ? `?projectId=${projectId}` : '';
-      const response = await fetch(`/api/analytics/projects/progress${queryString}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/analytics/projects/progress${queryString}`, {
         credentials: 'include',
       });
 
@@ -308,7 +390,8 @@ export const fetchProjectVelocityThunk = createAsyncThunk(
   ) => {
     try {
       const queryString = buildQueryString(params);
-      const response = await fetch(`/api/analytics/projects/velocity?${queryString}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/analytics/projects/velocity?${queryString}`, {
         credentials: 'include',
       });
 
@@ -330,7 +413,8 @@ export const fetchProjectHealthScoresThunk = createAsyncThunk(
   async (projectId: number | null, { rejectWithValue }) => {
     try {
       const queryString = projectId ? `?projectId=${projectId}` : '';
-      const response = await fetch(`/api/analytics/projects/health${queryString}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/analytics/projects/health${queryString}`, {
         credentials: 'include',
       });
 
@@ -353,7 +437,8 @@ export const fetchStudyProgressDistributionThunk = createAsyncThunk(
   async (projectId: number | null, { rejectWithValue }) => {
     try {
       const queryString = projectId ? `?projectId=${projectId}` : '';
-      const response = await fetch(`/api/analytics/studies/distribution${queryString}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/analytics/studies/distribution${queryString}`, {
         credentials: 'include',
       });
 
@@ -375,7 +460,8 @@ export const fetchStudyCompletionForecastThunk = createAsyncThunk(
   async (studyId: number | null, { rejectWithValue }) => {
     try {
       const queryString = studyId ? `?studyId=${studyId}` : '';
-      const response = await fetch(`/api/analytics/studies/forecast${queryString}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/analytics/studies/forecast${queryString}`, {
         credentials: 'include',
       });
 
@@ -404,7 +490,8 @@ export const fetchTaskPriorityDistributionThunk = createAsyncThunk(
   ) => {
     try {
       const queryString = buildQueryString(params);
-      const response = await fetch(`/api/analytics/tasks/priority?${queryString}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/analytics/tasks/priority?${queryString}`, {
         credentials: 'include',
       });
 
@@ -425,7 +512,8 @@ export const fetchHighPriorityBacklogThunk = createAsyncThunk(
   'analytics/fetchHighPriorityBacklog',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await fetch('/api/analytics/tasks/backlog', {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest('/api/analytics/tasks/backlog', {
         credentials: 'include',
       });
 
@@ -455,7 +543,8 @@ export const fetchComplianceFlagRateThunk = createAsyncThunk(
   ) => {
     try {
       const queryString = buildQueryString(params);
-      const response = await fetch(`/api/analytics/compliance/rate?${queryString}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/analytics/compliance/rate?${queryString}`, {
         credentials: 'include',
       });
 
@@ -485,7 +574,8 @@ export const fetchComplianceFlagTrendsThunk = createAsyncThunk(
   ) => {
     try {
       const queryString = buildQueryString(params);
-      const response = await fetch(`/api/analytics/compliance/trends?${queryString}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/analytics/compliance/trends?${queryString}`, {
         credentials: 'include',
       });
 
@@ -514,7 +604,8 @@ export const fetchComplianceFlagResolutionTimeThunk = createAsyncThunk(
   ) => {
     try {
       const queryString = buildQueryString(params);
-      const response = await fetch(`/api/analytics/compliance/resolution-time?${queryString}`, {
+      // Use apiRequest to automatically include Authorization header
+      const response = await apiRequest(`/api/analytics/compliance/resolution-time?${queryString}`, {
         credentials: 'include',
       });
 
@@ -525,6 +616,103 @@ export const fetchComplianceFlagResolutionTimeThunk = createAsyncThunk(
 
       const data = await response.json();
       return data.data as ComplianceFlagResolutionTime[];
+    } catch (error) {
+      return rejectWithValue('Network error');
+    }
+  }
+);
+
+// Admin task metrics thunks
+export const fetchAdminTaskMetricsThunk = createAsyncThunk(
+  'analytics/fetchAdminTaskMetrics',
+  async (projectId: number | null, { rejectWithValue }) => {
+    try {
+      const queryString = projectId ? `?projectId=${projectId}` : '';
+      const response = await apiRequest(`/api/analytics/admin-tasks/metrics${queryString}`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return rejectWithValue(error.message || 'Failed to fetch admin task metrics');
+      }
+
+      const data = await response.json();
+      return data.data as AdminTaskMetrics;
+    } catch (error) {
+      return rejectWithValue('Network error');
+    }
+  }
+);
+
+export const fetchAdminTaskCompletionTrendsThunk = createAsyncThunk(
+  'analytics/fetchAdminTaskCompletionTrends',
+  async (
+    params: {
+      projectId?: number;
+      startDate?: string;
+      endDate?: string;
+      period?: 'day' | 'week' | 'month';
+    },
+    { rejectWithValue }
+  ) => {
+    try {
+      const queryString = buildQueryString(params);
+      const response = await apiRequest(`/api/analytics/admin-tasks/completion-trends?${queryString}`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return rejectWithValue(error.message || 'Failed to fetch admin task completion trends');
+      }
+
+      const data = await response.json();
+      return data.data as AdminTaskCompletionTrend[];
+    } catch (error) {
+      return rejectWithValue('Network error');
+    }
+  }
+);
+
+export const fetchAdminTaskAssignmentMetricsThunk = createAsyncThunk(
+  'analytics/fetchAdminTaskAssignmentMetrics',
+  async (projectId: number | null, { rejectWithValue }) => {
+    try {
+      const queryString = projectId ? `?projectId=${projectId}` : '';
+      const response = await apiRequest(`/api/analytics/admin-tasks/assignments${queryString}`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return rejectWithValue(error.message || 'Failed to fetch admin task assignment metrics');
+      }
+
+      const data = await response.json();
+      return data.data as AdminTaskAssignmentMetrics[];
+    } catch (error) {
+      return rejectWithValue('Network error');
+    }
+  }
+);
+
+export const fetchOverdueAdminTasksThunk = createAsyncThunk(
+  'analytics/fetchOverdueAdminTasks',
+  async (projectId: number | null, { rejectWithValue }) => {
+    try {
+      const queryString = projectId ? `?projectId=${projectId}` : '';
+      const response = await apiRequest(`/api/analytics/admin-tasks/overdue${queryString}`, {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return rejectWithValue(error.message || 'Failed to fetch overdue admin tasks');
+      }
+
+      const data = await response.json();
+      return data.data as OverdueAdminTask[];
     } catch (error) {
       return rejectWithValue('Network error');
     }
@@ -553,6 +741,10 @@ const analyticsSlice = createSlice({
       state.complianceFlagRateError = null;
       state.complianceFlagTrendsError = null;
       state.complianceFlagResolutionTimeError = null;
+      state.adminTaskMetricsError = null;
+      state.adminTaskCompletionTrendsError = null;
+      state.adminTaskAssignmentMetricsError = null;
+      state.overdueAdminTasksError = null;
     },
   },
   extraReducers: (builder) => {
@@ -719,6 +911,66 @@ const analyticsSlice = createSlice({
       .addCase(fetchComplianceFlagResolutionTimeThunk.rejected, (state, action) => {
         state.complianceFlagResolutionTimeLoading = false;
         state.complianceFlagResolutionTimeError = action.payload as string;
+      });
+
+    // Admin task metrics
+    builder
+      .addCase(fetchAdminTaskMetricsThunk.pending, (state) => {
+        state.adminTaskMetricsLoading = true;
+        state.adminTaskMetricsError = null;
+      })
+      .addCase(fetchAdminTaskMetricsThunk.fulfilled, (state, action) => {
+        state.adminTaskMetrics = action.payload;
+        state.adminTaskMetricsLoading = false;
+      })
+      .addCase(fetchAdminTaskMetricsThunk.rejected, (state, action) => {
+        state.adminTaskMetricsLoading = false;
+        state.adminTaskMetricsError = action.payload as string;
+      });
+
+    // Admin task completion trends
+    builder
+      .addCase(fetchAdminTaskCompletionTrendsThunk.pending, (state) => {
+        state.adminTaskCompletionTrendsLoading = true;
+        state.adminTaskCompletionTrendsError = null;
+      })
+      .addCase(fetchAdminTaskCompletionTrendsThunk.fulfilled, (state, action) => {
+        state.adminTaskCompletionTrends = action.payload;
+        state.adminTaskCompletionTrendsLoading = false;
+      })
+      .addCase(fetchAdminTaskCompletionTrendsThunk.rejected, (state, action) => {
+        state.adminTaskCompletionTrendsLoading = false;
+        state.adminTaskCompletionTrendsError = action.payload as string;
+      });
+
+    // Admin task assignment metrics
+    builder
+      .addCase(fetchAdminTaskAssignmentMetricsThunk.pending, (state) => {
+        state.adminTaskAssignmentMetricsLoading = true;
+        state.adminTaskAssignmentMetricsError = null;
+      })
+      .addCase(fetchAdminTaskAssignmentMetricsThunk.fulfilled, (state, action) => {
+        state.adminTaskAssignmentMetrics = action.payload;
+        state.adminTaskAssignmentMetricsLoading = false;
+      })
+      .addCase(fetchAdminTaskAssignmentMetricsThunk.rejected, (state, action) => {
+        state.adminTaskAssignmentMetricsLoading = false;
+        state.adminTaskAssignmentMetricsError = action.payload as string;
+      });
+
+    // Overdue admin tasks
+    builder
+      .addCase(fetchOverdueAdminTasksThunk.pending, (state) => {
+        state.overdueAdminTasksLoading = true;
+        state.overdueAdminTasksError = null;
+      })
+      .addCase(fetchOverdueAdminTasksThunk.fulfilled, (state, action) => {
+        state.overdueAdminTasks = action.payload;
+        state.overdueAdminTasksLoading = false;
+      })
+      .addCase(fetchOverdueAdminTasksThunk.rejected, (state, action) => {
+        state.overdueAdminTasksLoading = false;
+        state.overdueAdminTasksError = action.payload as string;
       });
   },
 });

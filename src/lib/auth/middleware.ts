@@ -1,17 +1,18 @@
-// Authentication middleware for API routes
+// Authentication middleware for API routes - uses external authentication API
 
 import { NextRequest } from 'next/server';
-import { verifyAccessToken, verifyRefreshToken, generateAccessToken } from './jwt';
+import { externalIsAuthenticated, externalRefreshToken } from '@/services/externalAuthService';
+import { syncUserFromExternalApi } from '@/services/userService';
 import { AuthenticationError } from '@/lib/utils/errors';
-import { User } from '@/lib/db/models';
 import { UserContext } from '@/types/rbac';
+import { UserRole } from '@/types/entities';
 
 export interface AuthenticatedRequest extends NextRequest {
   user?: UserContext;
 }
 
 /**
- * Authenticate request - verifies JWT token and attaches user to request
+ * Authenticate request - verifies token with external API and attaches user to request
  */
 export async function authenticateRequest(
   req: NextRequest
@@ -27,7 +28,7 @@ export async function authenticateRequest(
       try {
         const newAccessToken = await attemptTokenRefresh(refreshToken);
         if (newAccessToken) {
-          return attachUserToRequest(req, newAccessToken);
+          return await attachUserToRequest(req, newAccessToken);
         }
       } catch (error) {
         // Refresh failed, continue to throw auth error
@@ -36,9 +37,8 @@ export async function authenticateRequest(
     throw new AuthenticationError('No valid authentication token');
   }
 
-  // Verify access token
+  // Verify access token with external API
   try {
-    const payload = verifyAccessToken(accessToken);
     return await attachUserToRequest(req, accessToken);
   } catch (error) {
     // Token expired or invalid, try refresh
@@ -47,7 +47,7 @@ export async function authenticateRequest(
       try {
         const newAccessToken = await attemptTokenRefresh(refreshToken);
         if (newAccessToken) {
-          return attachUserToRequest(req, newAccessToken);
+          return await attachUserToRequest(req, newAccessToken);
         }
       } catch (refreshError) {
         // Refresh failed
@@ -58,50 +58,100 @@ export async function authenticateRequest(
 }
 
 /**
- * Attach user to request after token verification
+ * Attach user to request after token verification with external API
+ * Syncs user to local database and uses local database ID for all queries
  */
 async function attachUserToRequest(
   req: NextRequest,
   token: string
 ): Promise<AuthenticatedRequest> {
-  const payload = verifyAccessToken(token);
+  // Get refresh token from cookie (required by external API)
+  const refreshToken = req.cookies.get('refreshToken')?.value;
+
+  // Verify token with external API (requires both accessToken and refreshToken)
+  let authStatus;
+  try {
+    authStatus = await externalIsAuthenticated(token, refreshToken);
+  } catch (error) {
+    throw new AuthenticationError('Invalid or expired token');
+  }
   
-  // Verify user still exists and is active
-  const user = await User.findByPk(payload.userId);
-  if (!user || !user.isActive) {
-    throw new AuthenticationError('User account is inactive');
+  // Get user data from cache (stored during login)
+  // The isAuthenticated endpoint doesn't return user data, so we use cached data
+  if (!authStatus.user) {
+    throw new AuthenticationError('User data not available. Please login again.');
   }
 
-  // Attach user to request
+  // Extract role from apps array (find app with name "NTT")
+  const nttApp = authStatus.user.apps?.find((app) => app.name === 'NTT');
+  const userRole = nttApp?.Roles?.userType || 'Researcher'; // Default to Researcher if not found
+
+  // Sync user to local database (creates if doesn't exist, updates if exists)
+  // This ensures we have a local user record with the correct ID for database queries
+  const localUser = await syncUserFromExternalApi({
+    email: authStatus.user.email,
+    firstName: authStatus.user.firstName,
+    lastName: authStatus.user.lastName,
+    role: userRole as UserRole, // Map to UserRole enum
+  });
+
+  // Attach user to request using LOCAL database ID (not external API ID)
+  // This ensures all database queries work correctly
   (req as AuthenticatedRequest).user = {
-    id: user.id,
-    email: user.email,
-    role: user.role,
+    id: localUser.id, // Use local database ID, not external API ID
+    email: localUser.email,
+    role: localUser.role,
   };
 
   return req as AuthenticatedRequest;
 }
 
 /**
- * Attempt to refresh access token using refresh token
+ * Attempt to refresh access token using refresh token via external API
+ * Gets user info from token_sessions table to provide id and role to external API
  */
 async function attemptTokenRefresh(refreshToken: string): Promise<string | null> {
   try {
-    const payload = verifyRefreshToken(refreshToken);
+    // Try to get user info from token_sessions table
+    // Look up most recent non-expired session to get user id and role
+    const { TokenSession } = await import('@/lib/db/models');
+    const { Op } = await import('sequelize');
     
-    // Verify user exists and is active
-    const user = await User.findByPk(payload.userId);
-    if (!user || !user.isActive) {
+    let userId: number | undefined;
+    let userRole: string | undefined;
+    
+    try {
+      const recentSession = await TokenSession.findOne({
+        where: {
+          expiresAt: {
+            [Op.gt]: new Date(), // Not expired
+          },
+        },
+        order: [['createdAt', 'DESC']], // Most recent first
+        limit: 1,
+      });
+
+      if (recentSession?.userData) {
+        userId = recentSession.userData.id;
+        // Extract role from apps array
+        const nttApp = recentSession.userData.apps?.find((app: any) => app.name === 'NTT');
+        userRole = nttApp?.Roles?.userType || 'Researcher';
+      }
+    } catch (error) {
+      // Error looking up user info
+    }
+
+    // If we don't have user info, we can't refresh
+    if (!userId || !userRole) {
       return null;
     }
 
-    // Verify token version matches (for token invalidation)
-    if (payload.tokenVersion !== user.tokenVersion) {
-      return null;
-    }
-
-    // Generate new access token
-    return generateAccessToken(user.id, user.email, user.role);
+    const refreshResponse = await externalRefreshToken(refreshToken, userId, userRole);
+    
+    // Handle different response structures (token object or direct properties)
+    const newAccessToken = refreshResponse.token?.accessToken || refreshResponse.accessToken;
+    
+    return newAccessToken || null;
   } catch (error) {
     return null;
   }

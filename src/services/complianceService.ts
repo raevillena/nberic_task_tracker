@@ -30,17 +30,36 @@ export class ComplianceService {
     user: UserContext,
     transaction?: Transaction
   ) {
-    // Verify task exists
-    const task = await Task.findByPk(taskId, { transaction });
+    // Verify task exists and load assignedResearchers if needed
+    const task = await Task.findByPk(taskId, {
+      include: [
+        {
+          model: User,
+          as: 'assignedResearchers',
+          attributes: ['id'],
+          required: false,
+        },
+      ],
+      transaction,
+    });
     if (!task) {
       throw new NotFoundError(`Task with ID ${taskId} not found`);
     }
 
     // Researchers can only flag their assigned tasks
-    if (user.role === UserRole.RESEARCHER && task.assignedToId !== user.id) {
-      throw new PermissionError(
-        'You can only raise compliance flags for tasks assigned to you'
-      );
+    // Check both legacy assignedToId and many-to-many assignedResearchers
+    if (user.role === UserRole.RESEARCHER) {
+      const isAssigned = 
+        task.assignedToId === user.id ||
+        (task.assignedResearchers && 
+         Array.isArray(task.assignedResearchers) && 
+         task.assignedResearchers.some((r: any) => r.id === user.id));
+      
+      if (!isAssigned) {
+        throw new PermissionError(
+          'You can only raise compliance flags for tasks assigned to you'
+        );
+      }
     }
 
     if (!data.flagType || data.flagType.trim().length === 0) {
@@ -74,16 +93,36 @@ export class ComplianceService {
     transaction?: Transaction
   ) {
     // Verify task exists and user has access
-    const task = await Task.findByPk(taskId, { transaction });
+    // Load assignedResearchers to check assignment for researchers
+    const task = await Task.findByPk(taskId, {
+      include: [
+        {
+          model: User,
+          as: 'assignedResearchers',
+          attributes: ['id'],
+          required: false,
+        },
+      ],
+      transaction,
+    });
     if (!task) {
       throw new NotFoundError(`Task with ID ${taskId} not found`);
     }
 
     // Researchers can only see flags for their assigned tasks
-    if (user.role === UserRole.RESEARCHER && task.assignedToId !== user.id) {
-      throw new PermissionError(
-        'You do not have access to compliance flags for this task'
-      );
+    // Check both legacy assignedToId and many-to-many assignedResearchers
+    if (user.role === UserRole.RESEARCHER) {
+      const isAssigned = 
+        task.assignedToId === user.id ||
+        (task.assignedResearchers && 
+         Array.isArray(task.assignedResearchers) && 
+         task.assignedResearchers.some((r: any) => r.id === user.id));
+      
+      if (!isAssigned) {
+        throw new PermissionError(
+          'You do not have access to compliance flags for this task'
+        );
+      }
     }
 
     return await ComplianceFlag.findAll({
@@ -120,6 +159,14 @@ export class ComplianceService {
           model: Task,
           as: 'task',
           attributes: ['id', 'name', 'assignedToId'],
+          include: [
+            {
+              model: User,
+              as: 'assignedResearchers',
+              attributes: ['id'],
+              required: false,
+            },
+          ],
         },
         {
           model: User,
@@ -143,13 +190,26 @@ export class ComplianceService {
     // Researchers can only see flags for their assigned tasks
     // Type assertion needed because Sequelize relations aren't in the model type
     const flagData = flag as any;
-    if (
-      user.role === UserRole.RESEARCHER &&
-      flagData.task?.assignedToId !== user.id
-    ) {
-      throw new PermissionError(
-        'You do not have access to this compliance flag'
-      );
+    if (user.role === UserRole.RESEARCHER) {
+      const task = flagData.task;
+      if (!task) {
+        throw new PermissionError(
+          'You do not have access to this compliance flag'
+        );
+      }
+      
+      // Check both legacy assignedToId and many-to-many assignedResearchers
+      const isAssigned = 
+        task.assignedToId === user.id ||
+        (task.assignedResearchers && 
+         Array.isArray(task.assignedResearchers) && 
+         task.assignedResearchers.some((r: any) => r.id === user.id));
+      
+      if (!isAssigned) {
+        throw new PermissionError(
+          'You do not have access to this compliance flag'
+        );
+      }
     }
 
     return flag;
@@ -223,16 +283,36 @@ export class ComplianceService {
     transaction?: Transaction
   ) {
     // Verify task exists and user has access
-    const task = await Task.findByPk(taskId, { transaction });
+    // Load assignedResearchers to check assignment for researchers
+    const task = await Task.findByPk(taskId, {
+      include: [
+        {
+          model: User,
+          as: 'assignedResearchers',
+          attributes: ['id'],
+          required: false,
+        },
+      ],
+      transaction,
+    });
     if (!task) {
       throw new NotFoundError(`Task with ID ${taskId} not found`);
     }
 
     // Researchers can only see flags for their assigned tasks
-    if (user.role === UserRole.RESEARCHER && task.assignedToId !== user.id) {
-      throw new PermissionError(
-        'You do not have access to compliance flags for this task'
-      );
+    // Check both legacy assignedToId and many-to-many assignedResearchers
+    if (user.role === UserRole.RESEARCHER) {
+      const isAssigned = 
+        task.assignedToId === user.id ||
+        (task.assignedResearchers && 
+         Array.isArray(task.assignedResearchers) && 
+         task.assignedResearchers.some((r: any) => r.id === user.id));
+      
+      if (!isAssigned) {
+        throw new PermissionError(
+          'You do not have access to compliance flags for this task'
+        );
+      }
     }
 
     return await ComplianceFlag.findAll({

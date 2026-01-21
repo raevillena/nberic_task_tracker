@@ -73,20 +73,40 @@ const initialState: NotificationState = loadNotificationsFromStorage();
 // Async thunk to fetch notifications from database
 export const fetchNotificationsThunk = createAsyncThunk(
   'notifications/fetchNotifications',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
+    // Check if user is authenticated before making request
+    const state = getState() as any;
+    const isAuthenticated = state.auth?.isAuthenticated;
+    const accessToken = state.auth?.accessToken;
+
+    if (!isAuthenticated || !accessToken) {
+      // Silently skip if not authenticated (don't trigger refresh loop)
+      return rejectWithValue('Not authenticated');
+    }
+
     try {
-      const response = await fetch('/api/notifications', {
+      // Use apiRequest to automatically include Authorization header
+      const { apiRequest } = await import('@/lib/utils/api');
+      const response = await apiRequest('/api/notifications', {
         credentials: 'include',
       });
 
       if (!response.ok) {
+        // If 401, don't trigger refresh - just silently fail
+        if (response.status === 401) {
+          return rejectWithValue('Not authenticated');
+        }
         const error = await response.json();
         return rejectWithValue(error.message || 'Failed to fetch notifications');
       }
 
       const data = await response.json();
       return data.data || [];
-    } catch (error) {
+    } catch (error: any) {
+      // Don't trigger refresh loop on network errors
+      if (error.message?.includes('Session expired') || error.message?.includes('Not authenticated')) {
+        return rejectWithValue('Not authenticated');
+      }
       return rejectWithValue('Network error');
     }
   }
@@ -104,7 +124,9 @@ export const markNotificationAsReadThunk = createAsyncThunk(
     }
 
     try {
-      const response = await fetch(`/api/notifications/${notificationId}`, {
+      // Use apiRequest to automatically include Authorization header
+      const { apiRequest } = await import('@/lib/utils/api');
+      const response = await apiRequest(`/api/notifications/${notificationId}`, {
         method: 'PATCH',
         credentials: 'include',
       });

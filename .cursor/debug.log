@@ -909,3 +909,27 @@
 [ROOM:JOIN] User 1 (Manager) attempting to join task:5
 [ROOM:JOIN] Access check result for task:5: true
 [ROOM:JOIN] User 1 successfully joined task:5, memberCount=1
+[ROOM:JOIN] User 1 (Manager) attempting to join task:5
+[ROOM:JOIN] Access check result for task:5: true
+[ROOM:JOIN] User 1 successfully joined task:5, memberCount=1
+[ROOM:JOIN] User 1 (Manager) attempting to join task:5
+[ROOM:JOIN] Access check result for task:5: true
+[ROOM:JOIN] User 1 successfully joined task:5, memberCount=1
+[ROOM:JOIN] User 2 (Researcher) attempting to join task:5
+[ROOM:JOIN] Access check result for task:5: true
+[ROOM:JOIN] User 2 successfully joined task:5, memberCount=1
+[ROOM:JOIN] User 2 (Researcher) attempting to join task:5
+[ROOM:JOIN] Access check result for task:5: true
+[ROOM:JOIN] User 2 successfully joined task:5, memberCount=1
+[ROOM:JOIN] User 1 (Manager) attempting to join task:5
+[ROOM:JOIN] Access check result for task:5: true
+[ROOM:JOIN] User 1 successfully joined task:5, memberCount=2
+[ROOM:JOIN] User 1 (Manager) attempting to join task:5
+[ROOM:JOIN] Access check result for task:5: true
+[ROOM:JOIN] User 1 successfully joined task:5, memberCount=2
+[ROOM:JOIN] User 2 (Researcher) attempting to join task:5
+[ROOM:JOIN] Access check result for task:5: true
+[ROOM:JOIN] User 2 successfully joined task:5, memberCount=2
+[ROOM:JOIN] User 2 (Researcher) attempting to join task:5
+[ROOM:JOIN] Access check result for task:5: true
+[ROOM:JOIN] User 2 successfully joined task:5, memberCount=2

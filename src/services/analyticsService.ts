@@ -1603,8 +1603,8 @@ export class AnalyticsService {
       raw: true,
     });
 
-    // Get total and completed counts
-    const totalResult = await Task.findAll({
+    // Get total and completed counts (aggregate query returns plain objects, not Task instances)
+    const totalResult = (await Task.findAll({
       transaction,
       attributes: [
         [Task.sequelize!.fn('COUNT', Task.sequelize!.col('Task.id')), 'total'],
@@ -1620,7 +1620,7 @@ export class AnalyticsService {
       ],
       where: whereClause,
       raw: true,
-    });
+    })) as unknown as { total?: string | number; completed?: string | number }[];
 
     const total = parseInt(String(totalResult[0]?.total || '0'), 10);
     const completed = parseInt(String(totalResult[0]?.completed || '0'), 10);

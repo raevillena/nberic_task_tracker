@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { complianceService } from '@/services/complianceService';
-import { getAuthenticatedUser, createErrorResponse, getErrorStatusCode } from '../../../../../../../../../../middleware';
+import { getAuthenticatedUser, createErrorResponse, getErrorStatusCode } from '../../../../../../../../../middleware';
 
 /**
  * POST /api/projects/[id]/studies/[studyId]/tasks/[taskId]/compliance/[flagId]/dismiss

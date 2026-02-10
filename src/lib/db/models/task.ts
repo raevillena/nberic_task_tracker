@@ -4,6 +4,7 @@ import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../connection';
 import { TaskStatus, TaskPriority, TaskType } from '@/types/entities';
 import { Op } from 'sequelize';
+import type { User } from './user';
 
 interface TaskAttributes {
   id: number;
@@ -43,6 +44,9 @@ export class Task extends Model<TaskAttributes, TaskCreationAttributes> implemen
   declare deletedAt: Date | null;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
+
+  // Association (loaded when included via Task.findByPk(..., { include: [{ model: User, as: 'assignedResearchers' }] }))
+  declare assignedResearchers?: User[];
 }
 
 Task.init(

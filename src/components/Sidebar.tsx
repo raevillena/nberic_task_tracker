@@ -106,6 +106,10 @@ export default function Sidebar() {
           console.error('Failed to fetch unread counts:', response.status, response.statusText);
         }
       } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        if (msg.includes('timed out') || msg.includes('Session expired') || msg.includes('refresh')) {
+          return;
+        }
         console.error('Failed to fetch unread counts:', error);
       }
     }

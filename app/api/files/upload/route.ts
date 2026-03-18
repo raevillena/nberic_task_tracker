@@ -1,30 +1,51 @@
 // File upload API route for images and files
 
+// File upload API: supports external image server or local/PVC storage
+
 import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
 import { existsSync } from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { authenticateRequest } from '@/lib/auth/middleware';
+import { UPLOAD_DIR, UPLOAD_URL_PATH, IMAGE_SERVER_UPLOAD_URL } from '@/lib/fileStorage';
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads');
 
-// Ensure upload directory exists
 async function ensureUploadDir() {
   if (!existsSync(UPLOAD_DIR)) {
     await mkdir(UPLOAD_DIR, { recursive: true });
   }
 }
 
+/** Forward file to external image server. Server must POST multipart "file" and return JSON { url: string }. */
+async function uploadToImageServer(file: File): Promise<string> {
+  const form = new FormData();
+  form.append('file', file);
+  const headers: HeadersInit = {};
+  if (process.env.IMAGE_SERVER_AUTH_HEADER) {
+    headers['Authorization'] = process.env.IMAGE_SERVER_AUTH_HEADER;
+  }
+  const res = await fetch(IMAGE_SERVER_UPLOAD_URL, {
+    method: 'POST',
+    body: form,
+    headers,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Image server returned ${res.status}: ${text}`);
+  }
+  const data = (await res.json()) as { url?: string };
+  if (!data?.url || typeof data.url !== 'string') {
+    throw new Error('Image server response must be JSON with { url: string }');
+  }
+  return data.url;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate request
     await authenticateRequest(request);
-
-    await ensureUploadDir();
 
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -36,7 +57,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size
     const isImage = file.type.startsWith('image/');
     const maxSize = isImage ? MAX_IMAGE_SIZE : MAX_FILE_SIZE;
 
@@ -49,7 +69,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate image types
     if (isImage && !ALLOWED_IMAGE_TYPES.includes(file.type)) {
       return NextResponse.json(
         {
@@ -59,28 +78,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate unique filename
+    // External image server: forward file and return its URL (no local storage)
+    if (IMAGE_SERVER_UPLOAD_URL) {
+      const externalUrl = await uploadToImageServer(file);
+      return NextResponse.json({
+        fileId: null,
+        fileName: file.name,
+        storedFileName: externalUrl,
+        fileSize: file.size,
+        mimeType: file.type,
+        url: externalUrl,
+      });
+    }
+
+    // Local or PVC storage
+    await ensureUploadDir();
+
     const fileExtension = file.name.split('.').pop() || '';
     const fileName = `${uuidv4()}.${fileExtension}`;
-    const filePath = join(UPLOAD_DIR, fileName);
+    const filePath = `${UPLOAD_DIR}/${fileName}`.replace(/\/+/g, '/');
 
-    // Save file
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     await writeFile(filePath, buffer);
 
-    // Return file metadata
-    // In a production system, you'd save this to a database
-    // For now, we'll use the filename as a simple identifier
     const fileId = fileName.replace(`.${fileExtension}`, '');
+    const url = process.env.FILE_UPLOAD_DIR
+      ? `/api/files/${fileId}`
+      : `${UPLOAD_URL_PATH}/${fileName}`;
 
     return NextResponse.json({
-      fileId, // UUID without extension (for API route lookup)
-      fileName: file.name, // Original filename for display
-      storedFileName: fileName, // Stored filename (UUID + extension) for file access
+      fileId,
+      fileName: file.name,
+      storedFileName: fileName,
       fileSize: file.size,
       mimeType: file.type,
-      url: `/uploads/${fileName}`,
+      url,
     });
   } catch (error) {
     console.error('File upload error:', error);

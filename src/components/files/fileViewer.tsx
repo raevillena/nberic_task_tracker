@@ -4,6 +4,9 @@
 
 import { useEffect, useState } from 'react';
 import { Message } from '@/types/socket';
+import { getSignedUrl } from '@/lib/fileService';
+import { useAppSelector } from '@/store/hooks';
+import { selectAccessToken } from '@/store/slices/authSlice';
 
 interface FileViewerProps {
   message: Message | null;
@@ -26,6 +29,8 @@ export function FileViewer({
 }: FileViewerProps) {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
+  const accessToken = useAppSelector(selectAccessToken);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
 
   // Reset state when message changes
   useEffect(() => {
@@ -34,6 +39,60 @@ export function FileViewer({
       setImageLoading(true);
     }
   }, [message]);
+
+  // Resolve URL: legacy (http or /uploads) vs MSB private (objectKey via signed URL)
+  useEffect(() => {
+    let cancelled = false;
+
+    async function resolveUrl() {
+      if (!message) {
+        setFileUrl(null);
+        return;
+      }
+
+      const name = message.fileName;
+
+      // Legacy: full URL or absolute path
+      if (name?.startsWith('http') || name?.startsWith('/')) {
+        setFileUrl(name);
+        return;
+      }
+
+      // Legacy with local uploads: fall back to /uploads or /api/files
+      if (!name) {
+        if (message.fileId) {
+          setFileUrl(`/api/files/${message.fileId}`);
+        } else {
+          setFileUrl(null);
+        }
+        return;
+      }
+
+      // New MSB objectKey (e.g. task-chat/...)
+      if (!accessToken) {
+        setFileUrl(null);
+        return;
+      }
+
+      try {
+        const signed = await getSignedUrl(name, accessToken);
+        if (!cancelled) {
+          setFileUrl(signed);
+        }
+      } catch (e) {
+        console.error('[FileViewer] Failed to get signed URL', e);
+        if (!cancelled) {
+          setFileUrl(null);
+        }
+      }
+    }
+
+    resolveUrl();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [message, accessToken]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -67,9 +126,6 @@ export function FileViewer({
 
   if (!isOpen || !message) return null;
 
-  const fileUrl = message.fileName
-    ? `/uploads/${message.fileName}`
-    : `/api/files/${message.fileId || ''}`;
   const isImage = message.type === 'image';
   const displayName = message.content || message.fileName || 'File';
 

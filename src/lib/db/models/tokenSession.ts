@@ -1,7 +1,8 @@
 // TokenSession model
-// Stores temporary mapping of access tokens to user data
-// This is needed because the external API's isAuthenticated endpoint doesn't return user data
-// Sessions expire after 1 hour and are cleaned up automatically
+// Stores mapping of access/refresh tokens to user data for the external auth flow.
+// - isAuthenticated: lookup by accessTokenHash to get user data (external API returns only "Session Valid.").
+// - refresh: lookup by refreshTokenHash to get user id/role (external API requires id, role in body; cookie has refresh token).
+// Session expiry is 14 days to match external refresh token lifetime.
 
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../connection';
@@ -9,6 +10,7 @@ import { sequelize } from '../connection';
 interface TokenSessionAttributes {
   id: number;
   accessTokenHash: string;
+  refreshTokenHash: string | null;
   userEmail: string;
   userData: {
     id: number;
@@ -27,11 +29,12 @@ interface TokenSessionAttributes {
   updatedAt: Date;
 }
 
-interface TokenSessionCreationAttributes extends Optional<TokenSessionAttributes, 'id' | 'createdAt' | 'updatedAt'> {}
+interface TokenSessionCreationAttributes extends Optional<TokenSessionAttributes, 'id' | 'createdAt' | 'updatedAt' | 'refreshTokenHash'> {}
 
 export class TokenSession extends Model<TokenSessionAttributes, TokenSessionCreationAttributes> implements TokenSessionAttributes {
   declare id: number;
   declare accessTokenHash: string;
+  declare refreshTokenHash: string | null;
   declare userEmail: string;
   declare userData: TokenSessionAttributes['userData'];
   declare expiresAt: Date;
@@ -53,6 +56,12 @@ TokenSession.init(
       field: 'access_token_hash',
       comment: 'Hash of the access token (for security, we store hash not plain token)',
     },
+    refreshTokenHash: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'refresh_token_hash',
+      comment: 'Hash of the refresh token; used to look up user (id, role) when calling external /api/auth/refresh',
+    },
     userEmail: {
       type: DataTypes.STRING(255),
       allowNull: false,
@@ -69,7 +78,7 @@ TokenSession.init(
       type: DataTypes.DATE,
       allowNull: false,
       field: 'expires_at',
-      comment: 'When this token session expires (typically 1 hour from login)',
+      comment: 'When this session expires; 14 days to match external refresh token lifetime',
     },
     createdAt: {
       type: DataTypes.DATE,
@@ -94,6 +103,10 @@ TokenSession.init(
         unique: true,
         fields: ['access_token_hash'],
         name: 'idx_token_sessions_access_token_hash',
+      },
+      {
+        fields: ['refresh_token_hash'],
+        name: 'idx_token_sessions_refresh_token_hash',
       },
       {
         fields: ['user_email'],

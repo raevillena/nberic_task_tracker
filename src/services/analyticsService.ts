@@ -351,17 +351,6 @@ export class AnalyticsService {
         };
       });
 
-      // Debug: Log results
-      console.log(`[AnalyticsService] getProjectProgress: Found ${result.length} projects for user ${user.role} (${user.id})`);
-      if (result.length > 0) {
-        console.log(`[AnalyticsService] Projects:`, result.map((r) => ({ id: r.projectId, name: r.projectName, studies: r.studyCount })));
-      } else if (user.role === UserRole.MANAGER) {
-        console.warn('[AnalyticsService] No projects found for Manager - checking if projects exist in database...');
-        // Quick check: try to get projects without analytics
-        const allProjects = await Project.findAll({ limit: 5, attributes: ['id', 'name'] });
-        console.log(`[AnalyticsService] Total projects in DB: ${allProjects.length}`);
-      }
-
       return result;
     } catch (error) {
       console.error('[AnalyticsService] Error in getProjectProgress:', error);

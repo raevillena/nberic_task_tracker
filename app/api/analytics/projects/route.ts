@@ -21,9 +21,6 @@ export async function GET(request: NextRequest) {
 
     const metrics = await analyticsService.getProjectProgress(projectId, user);
 
-    // Debug logging
-    console.log(`[Analytics Projects] User: ${user.role} (${user.id}), Found ${metrics.length} projects`);
-
     return NextResponse.json({ data: metrics });
   } catch (error) {
     console.error('[Analytics Projects] Error:', error);

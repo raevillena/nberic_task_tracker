@@ -39,9 +39,12 @@ function getAccessToken(): string | null {
 
 // Track refresh attempts to prevent infinite loops
 let isRefreshing = false;
-let refreshPromise: Promise<void> | null = null;
-const REFRESH_TIMEOUT = 10000; // 10 seconds timeout for refresh
+/** Resolves to the new access token on success; rejects if refresh fails. */
+let refreshPromise: Promise<string> | null = null;
+// Match authSlice; allow time for app -> external auth round-trip
+const REFRESH_TIMEOUT = 30000; // 30 seconds
 const MAX_RETRY_ATTEMPTS = 1; // Only retry once after refresh
+let refreshTimeoutRetryCount = 0; // One retry when refresh times out (transient)
 
 import { 
   hasShownSessionExpiredNotificationFlag, 
@@ -80,8 +83,8 @@ export async function apiRequest(
     }
   }
   
-  // Only set Content-Type if not already set and if there's a body
-  if (!headers.has('Content-Type') && options.body) {
+  // Set Content-Type only for JSON bodies. For FormData, leave unset so the browser sets multipart boundary.
+  if (!headers.has('Content-Type') && options.body && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -101,20 +104,14 @@ export async function apiRequest(
 
   // Handle token expiry
   if (response.status === 401) {
-    // Prevent infinite loops: don't retry if we've already tried or if this is the refresh endpoint
-    // Also skip refresh for certain endpoints that should fail silently when not authenticated
-    const skipRefreshEndpoints = ['/api/auth/refresh', '/api/notifications', '/api/navigation/unread-counts'];
-    const shouldSkipRefresh = skipRefreshEndpoints.some(endpoint => url.includes(endpoint)) || retryCount >= MAX_RETRY_ATTEMPTS;
-    
+    const isRefreshEndpoint = url.includes('/api/auth/refresh');
+    const shouldSkipRefresh = isRefreshEndpoint || retryCount >= MAX_RETRY_ATTEMPTS;
+    // Background endpoints: refresh + retry on 401, but do not trigger logout on failure
+    const noLogoutOn401Endpoints = ['/api/notifications', '/api/navigation/unread-counts'];
+    const shouldNotLogout = noLogoutOn401Endpoints.some((endpoint) => url.includes(endpoint));
+
     if (shouldSkipRefresh) {
-      // For notification/navigation endpoints, just throw error without triggering refresh loop
-      if (url.includes('/api/notifications') || url.includes('/api/navigation/unread-counts')) {
-        throw new Error('Not authenticated');
-      }
-      // Refresh endpoint failed or max retries reached, logout user
-      // Don't show notification here - this is when we skip refresh, not when refresh fails
-      const { logoutThunk } = await import('@/store/slices/authSlice');
-      await getStore().dispatch(logoutThunk());
+      // Don't logout here: we only logout when refresh returns a "must re-login" code (see catch below)
       throw new Error('Session expired. Please login again.');
     }
 
@@ -122,21 +119,23 @@ export async function apiRequest(
     if (!isRefreshing) {
       isRefreshing = true;
       
-      // Create a single refresh promise that all concurrent requests can await
-      refreshPromise = (async () => {
+      // Single refresh promise so all concurrent 401s share one refresh and get the same new token
+      refreshPromise = (async (): Promise<string> => {
         try {
-          // Add timeout to refresh call
           const refreshController = new AbortController();
           const timeoutId = setTimeout(() => refreshController.abort(), REFRESH_TIMEOUT);
-          
           try {
             const refreshResult = await getStore().dispatch(refreshTokenThunk());
-            
             clearTimeout(timeoutId);
-            
             if (!refreshTokenThunk.fulfilled.match(refreshResult)) {
-              throw new Error('Token refresh failed');
+              const payload = (refreshResult as { payload?: { code?: string; message?: string } }).payload;
+              const err = new Error(payload?.message ?? 'Token refresh failed') as Error & { payload?: { code?: string } };
+              err.payload = payload;
+              throw err;
             }
+            const token = (refreshResult.payload as { accessToken: string })?.accessToken;
+            if (!token) throw new Error('No access token in refresh response');
+            return token;
           } catch (error) {
             clearTimeout(timeoutId);
             throw error;
@@ -148,75 +147,50 @@ export async function apiRequest(
       })();
     }
 
-    // Wait for the refresh to complete (or fail)
+    /** Only logout when refresh endpoint says token is invalid/expired/missing (user must re-login). */
+    const REFRESH_MUST_RELOGIN_CODES = ['REFRESH_TOKEN_MISSING', 'SESSION_NOT_FOUND', 'REFRESH_TOKEN_INVALID'];
+
+    let newToken: string;
     try {
-      await refreshPromise;
-    } catch (error) {
-      // Refresh failed, logout user
-      const { logoutThunk } = await import('@/store/slices/authSlice');
-      const store = getStore();
-      
-      // Show session expired notification (only once)
-      if (!hasShownSessionExpiredNotificationFlag()) {
-        setSessionExpiredNotificationShown();
-        store.dispatch(addNotification({
-          id: `session-expired-${Date.now()}`,
-          type: 'system',
-          title: 'Session Expired',
-          message: 'Your session has expired. Please log in again.',
-          timestamp: new Date().toISOString(),
-          read: false,
-        }));
-        
-        // Give the notification time to render before redirecting (2 seconds)
-        // This allows the user to see the notification before being redirected
-        setTimeout(() => {
-          store.dispatch(logoutThunk());
-        }, 2000); // 2 second delay to allow notification to be visible
-      } else {
-        // Already shown, logout immediately
-        await store.dispatch(logoutThunk());
+      newToken = (await refreshPromise) as string;
+      refreshTimeoutRetryCount = 0;
+    } catch (error: unknown) {
+      const payload = (error as Error & { payload?: { code?: string; message?: string } })?.payload;
+      const isTimeout = payload?.code === 'REFRESH_TIMEOUT';
+      if (isTimeout && refreshTimeoutRetryCount < 1) {
+        refreshTimeoutRetryCount++;
+        return apiRequest(url, options, retryCount);
       }
-      
-      throw new Error('Session expired. Please login again.');
+      if (isTimeout) refreshTimeoutRetryCount = 0;
+      const mustRelogin = payload?.code && REFRESH_MUST_RELOGIN_CODES.includes(payload.code);
+      if (mustRelogin && !shouldNotLogout) {
+        const { logoutThunk } = await import('@/store/slices/authSlice');
+        const store = getStore();
+        if (!hasShownSessionExpiredNotificationFlag()) {
+          setSessionExpiredNotificationShown();
+          store.dispatch(addNotification({
+            id: `session-expired-${Date.now()}`,
+            type: 'system',
+            title: 'Session Expired',
+            message: 'Your session has expired. Please log in again.',
+            timestamp: new Date().toISOString(),
+            read: false,
+          }));
+          setTimeout(() => store.dispatch(logoutThunk()), 2000);
+        } else {
+          await store.dispatch(logoutThunk());
+        }
+      }
+      const message =
+        isTimeout
+          ? 'Request timed out. Please try again.'
+          : payload?.message ?? 'Session expired. Please login again.';
+      throw new Error(message);
     }
 
-    // Get new token from store
-    const newToken = getAccessToken();
-
-    if (newToken) {
-      // Retry original request with new token (only once)
-      headers.set('Authorization', `Bearer ${newToken}`);
-      return apiRequest(url, options, retryCount + 1);
-    } else {
-      // No new token, logout user
-      const { logoutThunk } = await import('@/store/slices/authSlice');
-      const store = getStore();
-      
-      // Show session expired notification (only once)
-      if (!hasShownSessionExpiredNotificationFlag()) {
-        setSessionExpiredNotificationShown();
-        store.dispatch(addNotification({
-          id: `session-expired-${Date.now()}`,
-          type: 'system',
-          title: 'Session Expired',
-          message: 'Your session has expired. Please log in again.',
-          timestamp: new Date().toISOString(),
-          read: false,
-        }));
-        
-        // Give the notification time to render before redirecting (2 seconds)
-        // This allows the user to see the notification before being redirected
-        setTimeout(() => {
-          store.dispatch(logoutThunk());
-        }, 2000); // 2 second delay to allow notification to be visible
-      } else {
-        // Already shown, logout immediately
-        await store.dispatch(logoutThunk());
-      }
-      
-      throw new Error('Session expired. Please login again.');
-    }
+    const retryHeaders = new Headers(options.headers);
+    retryHeaders.set('Authorization', `Bearer ${newToken}`);
+    return apiRequest(url, { ...options, headers: retryHeaders }, retryCount + 1);
   }
 
   return response;

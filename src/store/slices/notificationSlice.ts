@@ -96,11 +96,26 @@ export const fetchNotificationsThunk = createAsyncThunk(
         if (response.status === 401) {
           return rejectWithValue('Not authenticated');
         }
-        const error = await response.json();
-        return rejectWithValue(error.message || 'Failed to fetch notifications');
+        // Backend might return an empty body (e.g. 500), so guard JSON parsing
+        let errorMessage = 'Failed to fetch notifications';
+        try {
+          const error = await response.json();
+          if (error && typeof error.message === 'string') {
+            errorMessage = error.message;
+          }
+        } catch {
+          // Ignore JSON parse errors and fall back to default message
+        }
+        return rejectWithValue(errorMessage);
       }
 
-      const data = await response.json();
+      let data: any;
+      try {
+        data = await response.json();
+      } catch {
+        // Treat empty/invalid JSON as "no notifications" instead of crashing
+        return [];
+      }
       return data.data || [];
     } catch (error: any) {
       // Don't trigger refresh loop on network errors
@@ -132,8 +147,16 @@ export const markNotificationAsReadThunk = createAsyncThunk(
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        return rejectWithValue(error.message || 'Failed to mark notification as read');
+        let errorMessage = 'Failed to mark notification as read';
+        try {
+          const error = await response.json();
+          if (error && typeof error.message === 'string') {
+            errorMessage = error.message;
+          }
+        } catch {
+          // Ignore JSON parse errors and fall back to default message
+        }
+        return rejectWithValue(errorMessage);
       }
 
       return notificationId;

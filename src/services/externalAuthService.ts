@@ -195,23 +195,25 @@ export async function externalLogin(
     }),
   });
 
-  // Store user data with access token in database (expires in 1 hour)
-  // This is needed because isAuthenticated endpoint doesn't return user data
-  // We use database instead of in-memory cache because Next.js serverless functions
-  // don't share memory across invocations
+  // Store user data with access and refresh token hashes. Session lives 14 days to match external refresh token.
+  // - accessTokenHash: used by isAuthenticated lookup (external API returns only "Session Valid.").
+  // - refreshTokenHash: used by /api/auth/refresh to get user id/role (external API expects id, role in body).
   if (response.token?.accessToken && response.user) {
     try {
-      const tokenHash = hashToken(response.token.accessToken);
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      const accessTokenHash = hashToken(response.token.accessToken);
+      const refreshTokenHash = response.token.refreshToken
+        ? hashToken(response.token.refreshToken)
+        : null;
+      const REFRESH_TOKEN_DAYS = 14; // Match external auth refresh token expiry
+      const expiresAt = new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000);
 
-      // Delete any existing session for this token (in case of re-login)
       await TokenSession.destroy({
-        where: { accessTokenHash: tokenHash },
+        where: { accessTokenHash },
       });
 
-      // Create new session
       await TokenSession.create({
-        accessTokenHash: tokenHash,
+        accessTokenHash,
+        refreshTokenHash,
         userEmail: response.user.email,
         userData: {
           id: response.user.id,
@@ -224,16 +226,15 @@ export async function externalLogin(
       });
 
       if (process.env.NODE_ENV === 'development') {
-        console.log('[externalLogin] Stored user data in database for token:', {
-          tokenHash: `${tokenHash.substring(0, 20)}...`,
+        console.log('[externalLogin] Stored token session:', {
+          accessTokenHash: `${accessTokenHash.substring(0, 20)}...`,
+          hasRefreshHash: !!refreshTokenHash,
           userId: response.user.id,
-          email: response.user.email,
           expiresAt: expiresAt.toISOString(),
         });
       }
     } catch (error) {
       console.error('[externalLogin] Error storing token session:', error);
-      // Don't fail login if cache storage fails
     }
   }
 
@@ -310,11 +311,13 @@ export async function externalLogout(
 }
 
 /**
- * Check if user is authenticated using external API
- * This is the primary method for validating tokens - calls /api/auth/isAuthenticated
- * 
- * NOTE: The external API requires BOTH accessToken (in Authorization header) AND refreshToken (in cookie)
- * The API only returns { msg: "Session Valid." } on success - it doesn't return user data
+ * Check if user is authenticated using external API.
+ * This is the primary method for validating tokens - calls GET /api/auth/isAuthenticated.
+ *
+ * NOTE:
+ * - external controller defines this as POST /api/auth/isAuthenticated
+ * - requires BOTH accessToken (in Authorization header) AND refreshToken (in cookie)
+ * - returns { msg: "Session Valid." } on success - it doesn't return user data
  */
 export async function externalIsAuthenticated(
   accessToken: string,
@@ -332,20 +335,13 @@ export async function externalIsAuthenticated(
       headers['Cookie'] = `refreshToken=${refreshToken}`;
     }
 
-    // Calls external API's isAuthenticated endpoint to validate the token
-    // The external API requires BOTH accessToken (header) AND refreshToken (cookie)
+    // Calls external API's isAuthenticated endpoint to validate the token.
+    // The external controller is implemented as GET /api/auth/isAuthenticated and
+    // only needs accessToken (header) and refreshToken (cookie); no request body required.
     const response = await fetch(`${EXTERNAL_API_BASE_URL}/api/auth/isAuthenticated`, {
       method: 'GET',
       headers,
     });
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[externalIsAuthenticated] Response received:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-      });
-    }
 
     // Check for status 200 (success)
     if (response.status !== 200) {
@@ -380,17 +376,20 @@ export async function externalIsAuthenticated(
         (authResponse as any).user = session.userData;
       }
     } catch (error) {
-      console.error('[externalIsAuthenticated] Error retrieving token session:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[externalIsAuthenticated] Error retrieving token session:', error);
+      }
       // Continue without user data - authentication is still valid (status 200)
     }
 
     return authResponse;
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (process.env.NODE_ENV === 'development') {
+      const err = error as { message?: string; status?: number; response?: unknown };
       console.error('[externalIsAuthenticated] Error:', {
-        message: error?.message,
-        status: error?.status,
-        response: error?.response,
+        message: err?.message,
+        status: err?.status,
+        response: err?.response,
       });
     }
     throw error;

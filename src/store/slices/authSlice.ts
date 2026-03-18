@@ -140,7 +140,8 @@ export const logoutThunk = createAsyncThunk(
   }
 );
 
-const REFRESH_TIMEOUT = 10000; // 10 seconds timeout
+// Allow time for app -> external auth round-trip (can be slow under load)
+const REFRESH_TIMEOUT = 30000; // 30 seconds
 
 /**
  * Create a timeout promise that rejects after specified milliseconds
@@ -172,7 +173,13 @@ export const refreshTokenThunk = createAsyncThunk(
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          return rejectWithValue('Token refresh failed');
+          let payload: { code?: string; message?: string } = {};
+          try {
+            payload = await response.json();
+          } catch {
+            payload = { message: 'Token refresh failed' };
+          }
+          return rejectWithValue({ code: payload.code, message: payload.message ?? 'Token refresh failed' });
         }
 
         const data = await response.json();
@@ -195,16 +202,13 @@ export const refreshTokenThunk = createAsyncThunk(
         };
       } catch (error: any) {
         clearTimeout(timeoutId);
-        
-        // Handle timeout or abort errors
         if (error.name === 'AbortError' || error.message === 'Refresh request timeout') {
-          return rejectWithValue('Token refresh timeout');
+          return rejectWithValue({ code: 'REFRESH_TIMEOUT', message: 'Token refresh timeout' });
         }
-        
-        return rejectWithValue('Token refresh failed');
+        return rejectWithValue({ code: undefined, message: 'Token refresh failed' });
       }
     } catch (error) {
-      return rejectWithValue('Token refresh failed');
+      return rejectWithValue({ code: undefined, message: 'Token refresh failed' });
     }
   }
 );
@@ -411,15 +415,7 @@ const authSlice = createSlice({
       })
       .addCase(refreshTokenThunk.rejected, (state) => {
         state.isRefreshing = false;
-        state.isAuthenticated = false;
-        state.user = null;
-        state.accessToken = null;
-        state.tokenExpiry = null;
-
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('user');
-        }
+        // Don't clear session here; api.ts only dispatches logoutThunk when refresh returns a "must re-login" code
       });
   },
 });
@@ -429,6 +425,20 @@ export default authSlice.reducer;
 
 // Selectors with safety checks
 export const selectAccessToken = (state: { auth?: AuthState }) => state.auth?.accessToken ?? null;
+/**
+ * appId for File API and CDN URL construction.
+ * Comes from NEXT_PUBLIC_EXTERNAL_AUTH_APP_ID (same value as EXTERNAL_AUTH_APP_ID).
+ * The access token used for upload is the external-auth token, verified by the File API (e.g. Redis).
+ */
+export const selectAppId = (state: { auth?: AuthState }): string | number | null => {
+  const fromEnv = process.env.NEXT_PUBLIC_EXTERNAL_AUTH_APP_ID;
+  if (fromEnv === undefined || fromEnv === '') return null;
+  const n = parseInt(fromEnv, 10);
+  return Number.isNaN(n) ? fromEnv : n;
+};
+
+/** @deprecated Use selectAppId. Kept for compatibility. */
+export const selectAppIdFromToken = selectAppId;
 export const selectAuthUser = (state: { auth?: AuthState }) => state.auth?.user ?? null;
 export const selectIsAuthenticated = (state: { auth?: AuthState }) => state.auth?.isAuthenticated ?? false;
 export const selectAuthIsLoading = (state: { auth?: AuthState }) => state.auth?.isLoading ?? false;

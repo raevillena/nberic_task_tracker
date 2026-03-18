@@ -4,16 +4,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { externalRefreshToken } from '@/services/externalAuthService';
 import { TokenSession } from '@/lib/db/models';
 import { Op } from 'sequelize';
-import crypto from 'crypto';
+import { hashToken } from '@/lib/auth/tokenHash';
 
 const REFRESH_TIMEOUT = 10000; // 10 seconds timeout
-
-/**
- * Hash a refresh token (same algorithm as access tokens)
- */
-function hashToken(token: string): string {
-  return crypto.createHash('sha256').update(token).digest('hex');
-}
 
 /**
  * Create a timeout promise that rejects after specified milliseconds
@@ -30,45 +23,37 @@ export async function POST(req: NextRequest) {
     const refreshToken = req.cookies.get('refreshToken')?.value;
     if (!refreshToken) {
       return NextResponse.json(
-        { error: 'Unauthorized', message: 'No refresh token provided' },
+        { error: 'Unauthorized', message: 'No refresh token provided', code: 'REFRESH_TOKEN_MISSING' },
         { status: 401 }
       );
     }
 
-    // Try to get user info from token_sessions table
-    // Look up by refresh token hash (if we stored it) or by most recent non-expired session
-    // For now, we'll try to find the most recent non-expired session
-    // TODO: Add refreshTokenHash to token_sessions table and look up by that
+    // Look up user id/role by refresh token hash (external API expects id, role in body)
+    const refreshTokenHash = hashToken(refreshToken);
     let userId: number | undefined;
     let userRole: string | undefined;
-    
-    try {
-      // Try to find a recent non-expired session to get user info
-      // This is a workaround until we add refreshTokenHash to the table
-      const recentSession = await TokenSession.findOne({
-        where: {
-          expiresAt: {
-            [Op.gt]: new Date(), // Not expired
-          },
-        },
-        order: [['createdAt', 'DESC']], // Most recent first
-        limit: 1,
-      });
 
-      if (recentSession?.userData) {
-        userId = recentSession.userData.id;
-        // Extract role from apps array
-        const nttApp = recentSession.userData.apps?.find((app: any) => app.name === 'NTT');
+    let session: Awaited<ReturnType<typeof TokenSession.findOne>> = null;
+    try {
+      session = await TokenSession.findOne({
+        where: {
+          refreshTokenHash,
+          expiresAt: { [Op.gt]: new Date() },
+        },
+      });
+      const data = session ? (session as { userData?: { id: number; apps?: Array<{ name: string; Roles?: { userType: string } }> } }).userData : undefined;
+      if (data) {
+        userId = data.id;
+        const nttApp = data.apps?.find((app: { name: string }) => app.name === 'NTT');
         userRole = nttApp?.Roles?.userType || 'Researcher';
       }
     } catch (error) {
-      // Continue without user info - external API might still work
+      // Continue and return 401 below
     }
 
-    // If we don't have user info, we can't refresh (external API requires id and role)
     if (!userId || !userRole) {
       return NextResponse.json(
-        { error: 'Unauthorized', message: 'User session not found. Please login again.' },
+        { error: 'Unauthorized', message: 'User session not found. Please login again.', code: 'SESSION_NOT_FOUND' },
         { status: 401 }
       );
     }
@@ -81,63 +66,70 @@ export async function POST(req: NextRequest) {
         createTimeoutPromise(REFRESH_TIMEOUT),
       ]);
     } catch (error: any) {
-      // Handle timeout or other errors
+      const isTimeout = error.message?.includes('timeout');
+      const code = isTimeout ? 'REFRESH_TIMEOUT' : 'REFRESH_TOKEN_INVALID';
+      const message = isTimeout ? 'Refresh request timed out' : 'Invalid or expired refresh token';
       const errorResponse = NextResponse.json(
-        { 
-          error: 'Unauthorized', 
-          message: error.message?.includes('timeout') 
-            ? 'Refresh request timed out' 
-            : 'Invalid or expired refresh token' 
-        },
+        { error: 'Unauthorized', message, code },
         { status: 401 }
       );
-      
-      // Clear invalid refresh token cookie
-      errorResponse.cookies.delete('refreshToken');
-      errorResponse.cookies.set('refreshToken', '', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 0,
-        path: '/',
-      });
-      
+      if (!isTimeout) {
+        errorResponse.cookies.delete('refreshToken');
+        errorResponse.cookies.set('refreshToken', '', {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          maxAge: 0,
+          path: '/',
+        });
+      }
       return errorResponse;
     }
 
-    // Handle different response structures (token object or direct properties)
+    // External auth returns { accessToken } and may optionally return a new refresh token
     const newAccessToken = refreshResponse.token?.accessToken || refreshResponse.accessToken;
-    const newRefreshToken = refreshResponse.token?.refreshToken || refreshResponse.refreshToken;
-
     if (!newAccessToken) {
       throw new Error('No access token in refresh response');
     }
 
-    // Update refresh token cookie if a new one is provided
-    const response = NextResponse.json({
-      accessToken: newAccessToken,
-    });
+    // Update session with new access token hash so the next request (with this token) finds user data.
+    // If the external API rotated the refresh token, also persist the new refresh token hash so future
+    // refresh calls can still resolve the user session.
+    const newRefreshToken = refreshResponse.token?.refreshToken || refreshResponse.refreshToken;
 
+    if (session) {
+      try {
+        const updatePayload: { accessTokenHash: string; refreshTokenHash?: string | null } = {
+          accessTokenHash: hashToken(newAccessToken),
+        };
+
+        if (newRefreshToken) {
+          updatePayload.refreshTokenHash = hashToken(newRefreshToken);
+        }
+
+        await session.update(updatePayload);
+      } catch (err) {
+        console.error('[refresh] Failed to update session with new access token hash:', err);
+      }
+    }
+
+    const response = NextResponse.json({ accessToken: newAccessToken });
+    // Only set cookie if external API returned a new refresh token
     if (newRefreshToken) {
       response.cookies.set('refreshToken', newRefreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: refreshResponse.expiresIn || 7 * 24 * 60 * 60, // Use expiresIn from API or default to 7 days
+        maxAge: refreshResponse.expiresIn ?? 14 * 24 * 60 * 60, // 14 days to match external
         path: '/',
       });
     }
-
     return response;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-    
-    // Clear invalid refresh token cookie
     const errorResponse = NextResponse.json(
-      { error: 'Unauthorized', message: 'Invalid or expired refresh token' },
+      { error: 'Unauthorized', message: 'Invalid or expired refresh token', code: 'REFRESH_TOKEN_INVALID' },
       { status: 401 }
     );
-    
     errorResponse.cookies.delete('refreshToken');
     errorResponse.cookies.set('refreshToken', '', {
       httpOnly: true,
@@ -146,7 +138,6 @@ export async function POST(req: NextRequest) {
       maxAge: 0,
       path: '/',
     });
-
     return errorResponse;
   }
 }

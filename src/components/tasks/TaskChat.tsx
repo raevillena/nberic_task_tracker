@@ -21,9 +21,10 @@ import {
   selectActiveRoom,
   selectSocketConnected,
 } from '@/store/slices/messagesSlice';
-import { selectAuthUser } from '@/store/slices/authSlice';
-import { Message, MessageType } from '@/types/socket';
+import { selectAuthUser, selectAccessToken } from '@/store/slices/authSlice';
+import { Message } from '@/types/socket';
 import { FileViewer } from '@/components/files/fileViewer';
+import { uploadFile, getSignedUrl } from '@/lib/fileService';
 
 interface TaskChatProps {
   taskId: number;
@@ -45,12 +46,14 @@ export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps
   const activeRoom = useAppSelector(selectActiveRoom);
   const socketConnected = useAppSelector(selectSocketConnected);
   const user = useAppSelector(selectAuthUser);
+  const accessToken = useAppSelector(selectAccessToken);
   const [messageInput, setMessageInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [viewerMessage, setViewerMessage] = useState<Message | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [signedUrls, setSignedUrls] = useState<Record<number, string>>({});
 
   // Join room when component mounts and socket is connected
   useEffect(() => {
@@ -107,55 +110,45 @@ export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!accessToken) {
+      alert('You must be signed in to upload files.');
+      return;
+    }
+
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      // Use apiRequest to automatically include Authorization header
-      const { apiRequest } = await import('@/lib/utils/api');
-      const response = await apiRequest('/api/files/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      const fileData = await response.json();
-
-      // Determine message type based on file type
       const isImage = file.type.startsWith('image/');
-      const messageType: MessageType = isImage ? 'image' : 'file';
-
-      // Use stored filename (UUID + extension) for file access, original name for display
-      const storedFileName = fileData.storedFileName || fileData.url?.replace('/uploads/', '') || fileData.fileName;
+      // Upload to MSB.io File API in private folder task-chat/
+      const { objectKey } = await uploadFile(file, 'task-chat', accessToken);
+      const fileNameForMessage = objectKey;
+      const fileIdForMessage: number | undefined = undefined;
 
       if (isImage) {
         sendImageMessage(
           'task',
           taskId,
-          file.name, // Original filename as content/description
-          fileData.fileId,
-          storedFileName, // Stored filename for file access
-          fileData.fileSize,
-          fileData.mimeType
+          file.name,
+          fileIdForMessage,
+          fileNameForMessage,
+          file.size,
+          file.type
         );
       } else {
         sendFileMessage(
           'task',
           taskId,
-          file.name, // Original filename as content/description
-          fileData.fileId,
-          storedFileName, // Stored filename for file access
-          fileData.fileSize,
-          fileData.mimeType
+          file.name,
+          fileIdForMessage,
+          fileNameForMessage,
+          file.size,
+          file.type
         );
       }
     } catch (error) {
-      console.error('File upload error:', error);
-      alert('Failed to upload file. Please try again.');
+      console.error('[TaskChat] File upload error:', error);
+      alert(
+        error instanceof Error ? error.message : 'Failed to upload file. Please try again.'
+      );
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -163,6 +156,50 @@ export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps
       }
     }
   };
+
+  // Pre-fetch signed URLs for image/file messages that use MSB objectKeys (task-chat/*)
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchSigned() {
+      if (!accessToken) return;
+
+      const tasks: Promise<void>[] = [];
+
+      messages.forEach((m) => {
+        if (
+          (m.type === 'image' || m.type === 'file') &&
+          m.fileName &&
+          !m.fileName.startsWith('http') &&
+          !m.fileName.startsWith('/') &&
+          !signedUrls[m.id]
+        ) {
+          tasks.push(
+            (async () => {
+              try {
+                const url = await getSignedUrl(m.fileName!, accessToken);
+                if (!cancelled) {
+                  setSignedUrls((prev) => ({ ...prev, [m.id]: url }));
+                }
+              } catch (e) {
+                console.error('[TaskChat] Failed to get signed URL for message', m.id, e);
+              }
+            })()
+          );
+        }
+      });
+
+      if (tasks.length) {
+        await Promise.all(tasks);
+      }
+    }
+
+    fetchSigned();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [messages, accessToken, signedUrls]);
 
   const formatFileSize = (bytes: number | null): string => {
     if (!bytes) return '';
@@ -261,13 +298,22 @@ export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps
                 {message.type === 'image' && (
                   <div className="relative group">
                     <img
-                      src={message.fileName ? `/uploads/${message.fileName}` : `/api/files/${message.fileId || ''}`}
+                      src={
+                        message.fileName &&
+                        !message.fileName.startsWith('http') &&
+                        !message.fileName.startsWith('/')
+                          ? signedUrls[message.id] || ''
+                          : message.fileName
+                          ? `/uploads/${message.fileName}`
+                          : message.fileId
+                          ? `/api/files/${message.fileId}`
+                          : ''
+                      }
                       alt={message.content || 'Image'}
                       className="max-w-full rounded mt-2 cursor-pointer hover:opacity-90 transition-opacity"
                       style={{ maxHeight: '300px' }}
                       onClick={() => handleOpenViewer(message)}
                       onError={(e) => {
-                        // Fallback to API route if direct upload path fails
                         if (message.fileId) {
                           (e.target as HTMLImageElement).src = `/api/files/${message.fileId}`;
                         }

@@ -60,13 +60,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Set refresh token as httpOnly cookie
+    // Set refresh token as httpOnly cookie (14 days to match external auth refresh token expiry)
     if (authResponse.token.refreshToken) {
+      const REFRESH_COOKIE_DAYS = 14;
       response.cookies.set('refreshToken', authResponse.token.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60, // 7 days (adjust if API provides expiresIn)
+        maxAge: REFRESH_COOKIE_DAYS * 24 * 60 * 60,
         path: '/',
       });
     }

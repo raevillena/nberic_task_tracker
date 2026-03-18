@@ -43,3 +43,6 @@ next-env.d.ts
 *.sqlite
 *.db
 
+# Uploaded files (ephemeral; in production use PVC or object storage)
+/public/uploads/
+

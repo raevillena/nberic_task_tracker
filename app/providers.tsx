@@ -55,17 +55,12 @@ function SocketInitializer({ children }: { children: React.ReactNode }) {
   const socketInitialized = useRef(false);
 
   useEffect(() => {
-    // Only initialize socket if user is authenticated AND has a token
-    // This ensures socket only connects after successful login
     if (isAuthenticated && token && !socketInitialized.current) {
-      console.log('[SocketInitializer] User authenticated, initializing socket connection...');
       initializeSocketClient(token, dispatch, () => store.getState());
       socketInitialized.current = true;
     }
 
-    // If user is not authenticated or token is removed (logout), disconnect socket
     if ((!isAuthenticated || !token) && socketInitialized.current) {
-      console.log('[SocketInitializer] User logged out, disconnecting socket...');
       disconnectSocket();
       socketInitialized.current = false;
     }

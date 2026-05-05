@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nberic-task-tracker-migrate
+  namespace: default
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        job: nberic-task-tracker-migrate
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: raevillena21/ntt:v1
+          imagePullPolicy: Always
+          command: ["npm"]
+          args: ["run", "db:migrate"]
+          envFrom:
+            - configMapRef:
+                name: nberic-task-tracker-config
+            - secretRef:
+                name: nberic-task-tracker-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

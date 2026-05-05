@@ -60,15 +60,9 @@ export function initializeSocketClient(
     if (currentToken === token) {
       // Same token, socket already connected and initialized - just return existing socket
       // Event handlers are already set up, so we're good
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[initializeSocketClient] Reusing existing socket connection');
-      }
       return socket;
     }
     // Token changed, disconnect old socket
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[initializeSocketClient] Token changed, reconnecting socket');
-    }
     socket.disconnect();
     isInitialized = false;
   }
@@ -91,7 +85,6 @@ export function initializeSocketClient(
 
   // Connection event handlers
   socket.on('connect', () => {
-    console.log('Socket connected');
     dispatch(setSocketConnected(true));
     dispatch(setSocketError(null));
     
@@ -114,7 +107,6 @@ export function initializeSocketClient(
   });
 
   socket.on('disconnect', (reason) => {
-    console.log('Socket disconnected:', reason);
     dispatch(setSocketConnected(false));
     
     // Only show offline notification if it's not a manual disconnect
@@ -136,7 +128,6 @@ export function initializeSocketClient(
   });
 
   socket.on('connect_error', (error) => {
-    console.error('Socket connection error:', error);
     dispatch(setSocketError(error.message));
     
     reconnectAttempts++;
@@ -183,18 +174,15 @@ export function initializeSocketClient(
 
   // Authentication handlers
   socket.on('auth:success', (data) => {
-    console.log('Socket authenticated:', data);
     dispatch(setSocketAuthenticated(data));
   });
 
   socket.on('auth:failed', (data) => {
-    console.error('Socket authentication failed:', data);
     dispatch(setSocketError(data.message));
   });
 
   // Room management handlers
   socket.on('room:joined', (data) => {
-    console.log('Joined room:', data);
     dispatch(
       setActiveRoom({
         type: data.roomType,
@@ -204,17 +192,14 @@ export function initializeSocketClient(
   });
 
   socket.on('room:left', (data) => {
-    console.log('Left room:', data);
   });
 
   socket.on('room:error', (data) => {
-    console.error('Room error:', data);
     dispatch(setSocketError(data.message));
   });
 
   // Message handlers
   socket.on('message:history', (data) => {
-    console.log('Message history received:', data);
     const roomKey = `${data.roomType}:${data.roomId}`;
     dispatch(
       setMessages({
@@ -227,15 +212,6 @@ export function initializeSocketClient(
   });
 
   socket.on('message:new', (data) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[message:new] New message received:', {
-        messageId: data.message.id,
-        roomType: data.message.roomType,
-        roomId: data.message.roomId,
-        senderId: data.message.senderId,
-        content: data.message.content?.substring(0, 50),
-      });
-    }
     const roomKey = `${data.message.roomType}:${data.message.roomId}`;
     
     // Check if message already exists to avoid duplicates
@@ -244,26 +220,12 @@ export function initializeSocketClient(
     const messageExists = existingMessages.some((m: any) => m.id === data.message.id);
     
     if (!messageExists) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[message:new] Adding message to Redux:', {
-          roomKey,
-          messageId: data.message.id,
-          currentMessageCount: existingMessages.length,
-        });
-      }
       dispatch(
         addMessage({
           roomKey,
           message: data.message,
         })
       );
-    } else {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[message:new] Message already exists, skipping:', {
-          roomKey,
-          messageId: data.message.id,
-        });
-      }
     }
     
     // NOTE: Toast notifications are now handled by the 'notification:new' event
@@ -272,7 +234,6 @@ export function initializeSocketClient(
   });
 
   socket.on('message:edited', (data) => {
-    console.log('Message edited:', data);
     const roomKey = `${data.message.roomType}:${data.message.roomId}`;
     dispatch(
       updateMessage({
@@ -283,7 +244,6 @@ export function initializeSocketClient(
   });
 
   socket.on('message:deleted', (data) => {
-    console.log('Message deleted:', data);
     const roomKey = `${data.roomType}:${data.roomId}`;
     dispatch(
       deleteMessage({
@@ -294,7 +254,6 @@ export function initializeSocketClient(
   });
 
   socket.on('message:read', (data) => {
-    console.log('Message read:', data);
     // Handle read receipts if needed
   });
 
@@ -321,17 +280,14 @@ export function initializeSocketClient(
 
   // Task event handlers - real-time task updates
   socket.on('task:updated', (data) => {
-    console.log('Task updated via socket:', data);
     dispatch(updateTaskFromSocket(data.task));
   });
 
   socket.on('task:completed', (data) => {
-    console.log('Task completed via socket:', data);
     dispatch(updateTaskFromSocket(data.task));
   });
 
   socket.on('task:assigned', (data) => {
-    console.log('Task assigned via socket:', data);
     const state = getState?.();
     const currentUserId = state?.auth?.user?.id;
     
@@ -350,7 +306,6 @@ export function initializeSocketClient(
 
   // Progress event handlers - real-time progress updates
   socket.on('progress:task:updated', (data) => {
-    console.log('Task progress updated via socket:', data);
     dispatch(
       updateProgressFromSocket({
         type: 'task',
@@ -361,7 +316,6 @@ export function initializeSocketClient(
   });
 
   socket.on('progress:study:updated', (data) => {
-    console.log('Study progress updated via socket:', data);
     dispatch(
       updateProgressFromSocket({
         type: 'study',
@@ -372,7 +326,6 @@ export function initializeSocketClient(
   });
 
   socket.on('progress:project:updated', (data) => {
-    console.log('Project progress updated via socket:', data);
     dispatch(
       updateProgressFromSocket({
         type: 'project',
@@ -384,17 +337,9 @@ export function initializeSocketClient(
 
   // Task request event handlers
   socket.on('task-request:created', (data) => {
-    console.log('Task request created via socket:', data);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/e852ecc4-6e60-4763-9b73-f1b441565d96',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:292',message:'task-request:created received',data:{requestId:data.request?.id,taskId:data.request?.taskId,taskCreatedById:data.task?.createdById},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     const state = getState?.();
     const currentUserId = state?.auth?.user?.id;
     const currentUserRole = state?.auth?.user?.role;
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/e852ecc4-6e60-4763-9b73-f1b441565d96',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'client.ts:298',message:'Checking manager match',data:{currentUserId,currentUserRole,taskCreatedById:data.task?.createdById,isMatch:currentUserRole === UserRole.MANAGER && currentUserId && data.task?.createdById === currentUserId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
 
     // Only notify the manager who created the task (task.createdById)
     // Check if current user is a manager AND is the creator of the task
@@ -436,7 +381,6 @@ export function initializeSocketClient(
   });
 
   socket.on('task-request:approved', (data) => {
-    console.log('Task request approved via socket:', data);
     const state = getState?.();
     const currentUserId = state?.auth?.user?.id;
 
@@ -477,7 +421,6 @@ export function initializeSocketClient(
   });
 
   socket.on('task-request:rejected', (data) => {
-    console.log('Task request rejected via socket:', data);
     const state = getState?.();
     const currentUserId = state?.auth?.user?.id;
 
@@ -520,7 +463,6 @@ export function initializeSocketClient(
   // Real-time notification handler - for notifications sent directly to user
   // This handles notifications for users who are NOT in the chat room
   socket.on('notification:new', (data) => {
-    console.log('Real-time notification received:', data);
     const state = getState?.();
     const currentUserId = state?.auth?.user?.id;
 

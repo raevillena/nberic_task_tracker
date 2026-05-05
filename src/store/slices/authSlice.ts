@@ -97,9 +97,7 @@ export const loginThunk = createAsyncThunk(
           tokenExpiry = payload.exp * 1000; // Convert to milliseconds
         }
       } catch (error) {
-        // Token is not a JWT (likely from external API), that's okay
-        // We'll rely on the external API to validate it
-        console.debug('Token is not a JWT format (expected for external API)');
+        // Token is not a JWT (likely from external API); rely on external API to validate it
       }
 
       return {
@@ -294,10 +292,10 @@ const authSlice = createSlice({
       const storedUser = localStorage.getItem('user');
 
       if (process.env.NODE_ENV === 'development') {
-        console.log('[authSlice] initializeAuth:', {
+        // eslint-disable-next-line no-console
+        console.log('[authSlice] initializeAuth (dev)', {
           hasStoredToken: !!storedToken,
           hasStoredUser: !!storedUser,
-          tokenLength: storedToken?.length || 0,
         });
       }
 
@@ -317,11 +315,7 @@ const authSlice = createSlice({
               isTokenValid = tokenExpiry > Date.now();
             }
           } catch (error) {
-            // Token is not a JWT (likely from external API), assume it's valid
-            // The external API will validate it on the server side
-            if (process.env.NODE_ENV === 'development') {
-              console.debug('[authSlice] Token is not a JWT format (expected for external API)');
-            }
+            // Token is not a JWT (likely from external API); assume it's valid and let server validate
           }
 
           if (isTokenValid) {
@@ -329,35 +323,19 @@ const authSlice = createSlice({
             state.user = user;
             state.tokenExpiry = tokenExpiry;
             state.isAuthenticated = true;
-            
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[authSlice] Auth initialized from localStorage:', {
-                hasToken: true,
-                userId: user.id,
-                email: user.email,
-                role: user.role,
-              });
-            }
           } else {
             // Token expired, clear storage
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[authSlice] Token expired, clearing storage');
-            }
             localStorage.removeItem('accessToken');
             localStorage.removeItem('user');
           }
         } catch (error) {
           // Invalid data, clear storage
-          if (process.env.NODE_ENV === 'development') {
-            console.error('[authSlice] Error parsing stored auth data:', error);
-          }
           localStorage.removeItem('accessToken');
           localStorage.removeItem('user');
         }
-      } else {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[authSlice] No stored auth data found');
-        }
+      } else if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log('[authSlice] No stored auth data found (dev)');
       }
     },
   },
@@ -381,19 +359,6 @@ const authSlice = createSlice({
         if (typeof window !== 'undefined') {
           localStorage.setItem('accessToken', action.payload.accessToken);
           localStorage.setItem('user', JSON.stringify(action.payload.user));
-          
-          // Debug logging
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[authSlice] Login successful, token stored:', {
-              hasToken: !!action.payload.accessToken,
-              tokenLength: action.payload.accessToken.length,
-              tokenPreview: `${action.payload.accessToken.substring(0, 20)}...`,
-              userId: action.payload.user.id,
-              email: action.payload.user.email,
-              role: action.payload.user.role,
-              storedInLocalStorage: true,
-            });
-          }
         }
       })
       .addCase(loginThunk.rejected, (state, action) => {

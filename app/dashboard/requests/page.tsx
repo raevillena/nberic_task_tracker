@@ -166,7 +166,7 @@ export default function RequestsPage() {
       }
 
       const result = await response.json();
-      console.log('Request approved successfully:', result);
+      // Request approved successfully; state is updated via follow-up fetch
       
       // Check if task was already completed (from response or task status)
       const request = requests.find((r) => r.id === requestId);

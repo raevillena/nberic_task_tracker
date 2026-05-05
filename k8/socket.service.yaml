@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nberic-task-tracker-socket
+  namespace: default
+spec:
+  selector:
+    app: nberic-task-tracker-socket
+  ports:
+    - name: socket
+      port: 3001
+      targetPort: 3001
+      nodePort: 31131
+  type: NodePort

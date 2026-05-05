@@ -51,15 +51,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[login] Response created:', {
-        hasAccessToken: !!authResponse.token.accessToken,
-        userId: authResponse.user.id,
-        role: userRole,
-        settingRefreshCookie: !!authResponse.token.refreshToken,
-      });
-    }
-
     // Set refresh token as httpOnly cookie (14 days to match external auth refresh token expiry)
     if (authResponse.token.refreshToken) {
       const REFRESH_COOKIE_DAYS = 14;

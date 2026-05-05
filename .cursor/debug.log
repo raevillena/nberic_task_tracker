@@ -2382,3 +2382,12 @@
 [ROOM:JOIN] User 2 (Researcher) attempting to join task:2
 [ROOM:JOIN] Access check result for task:2: true
 [ROOM:JOIN] User 2 successfully joined task:2, memberCount=1
+[ROOM:JOIN] User 2 (Researcher) attempting to join task:4
+[ROOM:JOIN] Access check result for task:4: true
+[ROOM:JOIN] User 2 successfully joined task:4, memberCount=1
+[ROOM:JOIN] User 2 (Researcher) attempting to join task:1
+[ROOM:JOIN] Access check result for task:1: true
+[ROOM:JOIN] User 2 successfully joined task:1, memberCount=1
+[ROOM:JOIN] User 2 (Researcher) attempting to join task:4
+[ROOM:JOIN] Access check result for task:4: true
+[ROOM:JOIN] User 2 successfully joined task:4, memberCount=1

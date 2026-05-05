@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nberic-task-tracker-web
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nberic-task-tracker-web
+  template:
+    metadata:
+      labels:
+        app: nberic-task-tracker-web
+    spec:
+      containers:
+        - name: web
+          image: raevillena21/ntt:v1
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: nberic-task-tracker-config
+            - secretRef:
+                name: nberic-task-tracker-secrets
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /login
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /login
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30

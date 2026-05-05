@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nberic-task-tracker-seed
+  namespace: default
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        job: nberic-task-tracker-seed
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: seed
+          image: raevillena21/ntt:v1
+          imagePullPolicy: Always
+          command: ["npm"]
+          args: ["run", "db:seed"]
+          envFrom:
+            - configMapRef:
+                name: nberic-task-tracker-config
+            - secretRef:
+                name: nberic-task-tracker-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

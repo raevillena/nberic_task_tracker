@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nberic-task-tracker-socket
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nberic-task-tracker-socket
+  template:
+    metadata:
+      labels:
+        app: nberic-task-tracker-socket
+    spec:
+      containers:
+        - name: socket
+          image: raevillena21/ntt:v1
+          imagePullPolicy: Always
+          command: ["npm"]
+          args: ["run", "dev:socket"]
+          ports:
+            - name: socket
+              containerPort: 3001
+          envFrom:
+            - configMapRef:
+                name: nberic-task-tracker-config
+            - secretRef:
+                name: nberic-task-tracker-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:
+            tcpSocket:
+              port: socket
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: socket
+            initialDelaySeconds: 30
+            periodSeconds: 30

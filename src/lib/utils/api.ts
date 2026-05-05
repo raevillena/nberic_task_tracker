@@ -23,17 +23,6 @@ function getAccessToken(): string | null {
   const store = getStore();
   const state = store.getState();
   const token = selectAccessToken(state);
-  
-  // Debug logging
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[apiRequest] Token check:', {
-      hasToken: !!token,
-      tokenLength: token?.length || 0,
-      tokenPreview: token ? `${token.substring(0, 20)}...` : 'null',
-      isAuthenticated: selectIsAuthenticated(state),
-    });
-  }
-  
   return token;
 }
 
@@ -70,30 +59,11 @@ export async function apiRequest(
   const headers = new Headers(options.headers);
   if (accessToken) {
     headers.set('Authorization', `Bearer ${accessToken}`);
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[apiRequest] Adding Authorization header:', {
-        url,
-        hasToken: true,
-        tokenPreview: `${accessToken.substring(0, 20)}...`,
-      });
-    }
-  } else {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[apiRequest] No access token available for request:', url);
-    }
   }
   
   // Set Content-Type only for JSON bodies. For FormData, leave unset so the browser sets multipart boundary.
   if (!headers.has('Content-Type') && options.body && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
-  }
-
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[apiRequest] Making request:', {
-      url,
-      method: options.method || 'GET',
-      hasAuthHeader: headers.has('Authorization'),
-    });
   }
 
   const response = await fetch(url, {

@@ -267,7 +267,7 @@ export function FileViewer({
                     Retry
                   </button>
                 </div>
-              ) : (
+              ) : fileUrl ? (
                 <img
                   src={fileUrl}
                   alt={displayName}
@@ -276,7 +276,7 @@ export function FileViewer({
                   onError={() => {
                     setImageLoading(false);
                     // Try fallback URL if available
-                    if (message.fileId && !fileUrl.includes('/api/files/')) {
+                    if (message.fileId && fileUrl && !fileUrl.includes('/api/files/')) {
                       const img = document.querySelector(`img[src="${fileUrl}"]`) as HTMLImageElement;
                       if (img) {
                         img.src = `/api/files/${message.fileId}`;
@@ -286,6 +286,10 @@ export function FileViewer({
                     setImageError(true);
                   }}
                 />
+              ) : (
+                <div className="p-8 text-center text-gray-400">
+                  <p className="text-sm">Image is not available.</p>
+                </div>
               )}
             </div>
           ) : (
@@ -310,7 +314,7 @@ export function FileViewer({
                 </p>
               )}
               <a
-                href={fileUrl}
+                href={fileUrl ?? undefined}
                 download={displayName}
                 className="inline-flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
                 onClick={(e) => e.stopPropagation()}

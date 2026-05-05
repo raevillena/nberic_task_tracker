@@ -59,19 +59,19 @@ export function TaskChat({ taskId, taskName, projectId, studyId }: TaskChatProps
   useEffect(() => {
     if (socketConnected) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[TaskChat] Joining room:', { type: 'task', id: taskId });
+      // Join the task room for real-time updates
       }
       joinRoom('task', taskId);
     } else {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[TaskChat] Socket not connected, cannot join room yet');
+      // Socket will join automatically once connected
       }
     }
 
     return () => {
       if (socketConnected) {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[TaskChat] Leaving room:', { type: 'task', id: taskId });
+        // Leave task room when component unmounts
         }
         leaveRoom('task', taskId);
       }

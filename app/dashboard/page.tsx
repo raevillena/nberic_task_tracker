@@ -82,17 +82,6 @@ export default function AnalyticsDashboard() {
         productivityStartDate.setDate(productivityStartDate.getDate() - 90); // Last 90 days
 
         // Phase 1: Fetch critical metrics first (above the fold)
-        // Debug: Check token before making requests
-        if (process.env.NODE_ENV === 'development') {
-          // Use useAppSelector hook result instead of store.getState()
-          // The user and auth state are already available via useAppSelector above
-          console.log('[Dashboard] Fetching analytics, token check:', {
-            hasUser: !!user,
-            userId: user?.id,
-            userRole: user?.role,
-          });
-        }
-
         const [
           workloadRes,
           projectsRes,

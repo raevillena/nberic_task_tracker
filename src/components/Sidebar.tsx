@@ -81,7 +81,7 @@ export default function Sidebar() {
         setPendingRequestsCount(data.count || 0);
       }
     } catch (error) {
-      console.error('Failed to fetch pending requests count:', error);
+      // Swallow pending request count errors; badge will simply not be shown
     }
   }, []);
 
@@ -103,14 +103,14 @@ export default function Sidebar() {
           };
           setUnreadCounts(counts);
         } else {
-          console.error('Failed to fetch unread counts:', response.status, response.statusText);
+          // Ignore unread-count errors; navigation remains functional without badges
         }
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         if (msg.includes('timed out') || msg.includes('Session expired') || msg.includes('refresh')) {
           return;
         }
-        console.error('Failed to fetch unread counts:', error);
+        // Ignore unread-count errors; navigation remains functional without badges
       }
     }
   }, [user?.role]);
@@ -242,8 +242,7 @@ export default function Sidebar() {
   // Debug: Log badge counts
   useEffect(() => {
     if (user?.role === UserRole.RESEARCHER) {
-      console.log('Sidebar unreadCounts state:', unreadCounts);
-      console.log('NavItemsWithBadges:', navItemsWithBadges.map(item => ({ name: item.name, badgeCount: (item as any).badgeCount })));
+      // Debug state for unreadCounts is intentionally not logged in production
     }
   }, [unreadCounts, navItemsWithBadges, user?.role]);
   
